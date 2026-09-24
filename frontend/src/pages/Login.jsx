@@ -182,11 +182,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans selection:bg-teal-500 selection:text-white">
       <div className="w-full max-w-xl relative z-10 space-y-6">
         {/* Navigation & Header */}
         <div className="flex items-center justify-between">
@@ -199,65 +195,65 @@ export default function Login() {
           </button>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            <span className="text-[11px] text-teal-300 font-mono">Supabase Auth Connected</span>
+            <span className="text-[11px] text-teal-400 font-mono">Supabase Auth Connected</span>
           </div>
         </div>
 
         {/* Brand Banner */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-slate-950 shadow-xl shadow-teal-500/20 mb-1">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white shadow-lg mb-1">
             <Stethoscope className="w-7 h-7" />
           </div>
           <h1 className="text-3xl font-black tracking-tight text-white">Sandhi-AI</h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            North Eastern Early Knee Osteoarthritis Tri-Factor Diagnostic & Surveillance Hub
+            North Eastern Early Knee Osteoarthritis Tri-Factor Diagnostic &amp; Surveillance Hub
           </p>
         </div>
 
         {/* Top Role Selector Tabs */}
-        <div className="grid grid-cols-2 gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-lg">
+        <div className="grid grid-cols-2 gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-md">
           <button
             type="button"
             onClick={() => { setPortalMode("patient"); setError(""); setSuccessMsg("") }}
-            className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
               portalMode === "patient"
-                ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md shadow-teal-500/20"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-teal-600 text-white shadow-sm border border-teal-500"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Patient & Citizen Portal</span>
+            <span>Patient &amp; Citizen Portal</span>
           </button>
           <button
             type="button"
             onClick={() => { setPortalMode("admin"); setError(""); setSuccessMsg("") }}
-            className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
               portalMode === "admin"
-                ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-teal-600 text-white shadow-sm border border-teal-500"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Doctor & Admin Hub</span>
+            <span>Doctor &amp; Admin Hub</span>
           </button>
         </div>
 
         {/* Error / Success Notifications */}
         {error && (
-          <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-xs text-rose-300 flex items-center gap-2 animate-shake">
-            <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+          <div className="p-3 bg-rose-950/70 border border-rose-800 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
             <span>{error}</span>
           </div>
         )}
         {successMsg && (
-          <div className="p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+          <div className="p-3 bg-emerald-950/70 border border-emerald-800 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{successMsg}</span>
           </div>
         )}
 
         {/* Card Body */}
-        <div className="bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
           
           {/* ======================================================= */}
           {/* MODE 1: PATIENT & CITIZEN PORTAL                        */}
@@ -269,10 +265,10 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => { setPatientTab("signin"); setError("") }}
-                  className={`pb-3 text-xs font-bold border-b-2 mr-6 transition ${
+                  className={`pb-3 text-xs font-bold border-b-2 mr-6 transition cursor-pointer ${
                     patientTab === "signin"
                       ? "border-teal-400 text-teal-300"
-                      : "border-transparent text-slate-400 hover:text-slate-200"
+                      : "border-transparent text-slate-400 hover:text-white"
                   }`}
                 >
                   Citizen Sign In
@@ -280,10 +276,10 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => { setPatientTab("signup"); setError("") }}
-                  className={`pb-3 text-xs font-bold border-b-2 transition ${
+                  className={`pb-3 text-xs font-bold border-b-2 transition cursor-pointer ${
                     patientTab === "signup"
                       ? "border-teal-400 text-teal-300"
-                      : "border-transparent text-slate-400 hover:text-slate-200"
+                      : "border-transparent text-slate-400 hover:text-white"
                   }`}
                 >
                   New Patient Registration (Sign Up)
@@ -304,7 +300,7 @@ export default function Login() {
                         value={patientId}
                         onChange={(e) => setPatientId(e.target.value)}
                         placeholder="+91 98640 12845 or Bimla Karmakar"
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition"
                         required
                       />
                     </div>
@@ -321,12 +317,12 @@ export default function Login() {
                         value={patientPassword}
                         onChange={(e) => setPatientPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPatientPass(!showPatientPass)}
-                        className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
+                        className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200"
                       >
                         {showPatientPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -336,13 +332,13 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 transition disabled:opacity-50"
+                    className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? (
                       <span>Verifying Patient Record...</span>
                     ) : (
                       <>
-                        <span>Sign In & Open Screening Hub</span>
+                        <span>Sign In &amp; Open Screening Hub</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -354,7 +350,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setPatientTab("signup")}
-                        className="text-teal-400 font-semibold hover:underline"
+                        className="text-teal-400 font-semibold hover:underline cursor-pointer"
                       >
                         Register New Patient
                       </button>
@@ -374,7 +370,7 @@ export default function Login() {
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
                         placeholder="e.g. Maya Sharma"
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-teal-400 focus:outline-none"
                         required
                       />
                     </div>
@@ -385,7 +381,7 @@ export default function Login() {
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}
                         placeholder="+91 98640 XXXXX"
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-teal-400 focus:outline-none"
                         required
                       />
                     </div>
@@ -398,7 +394,7 @@ export default function Login() {
                         type="number"
                         value={signupAge}
                         onChange={(e) => setSignupAge(e.target.value)}
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
                         min="18"
                         max="100"
                       />
@@ -408,7 +404,7 @@ export default function Login() {
                       <select
                         value={signupGender}
                         onChange={(e) => setSignupGender(e.target.value)}
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
                       >
                         <option value="Female">Female</option>
                         <option value="Male">Male</option>
@@ -422,13 +418,13 @@ export default function Login() {
                         value={signupPassword}
                         onChange={(e) => setSignupPassword(e.target.value)}
                         placeholder="sandhi123"
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-teal-400 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Height, Weight and Calculated BMI */}
-                  <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] text-slate-400 mb-1">Height (cm)</label>
@@ -464,7 +460,7 @@ export default function Login() {
                       <select
                         value={signupState}
                         onChange={(e) => setSignupState(e.target.value)}
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
                       >
                         <option value="Assam">Assam</option>
                         <option value="Meghalaya">Meghalaya</option>
@@ -481,7 +477,7 @@ export default function Login() {
                       <select
                         value={signupOccupation}
                         onChange={(e) => setSignupOccupation(e.target.value)}
-                        className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:border-teal-400 focus:outline-none"
                       >
                         <option value="Tea Garden Worker">Tea Garden Worker</option>
                         <option value="Agricultural Farmer">Agricultural Farmer</option>
@@ -495,13 +491,13 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 transition disabled:opacity-50"
+                    className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? (
                       <span>Saving to Supabase Database...</span>
                     ) : (
                       <>
-                        <span>Complete Registration & Begin Screening</span>
+                        <span>Complete Registration &amp; Begin Screening</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -516,11 +512,11 @@ export default function Login() {
           {/* ======================================================= */}
           {portalMode === "admin" && (
             <div className="space-y-4">
-              <div className="p-3 bg-sky-950/40 border border-sky-800/60 rounded-xl flex items-start gap-2.5 text-xs text-sky-300">
-                <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <div className="p-3 bg-teal-950/60 border border-teal-800 rounded-xl flex items-start gap-2.5 text-xs text-teal-200">
+                <ShieldCheck className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-white">Clinical Officer & Surveillance Access</p>
-                  <p className="text-[11px] text-sky-200/80 mt-0.5">
+                  <p className="font-semibold text-white">Clinical Officer &amp; Surveillance Access</p>
+                  <p className="text-[11px] text-teal-300 mt-0.5">
                     Authorized doctors, orthopedic specialists, and MDoNER state nodal officers only. Provides complete 8-state NER surveillance access.
                   </p>
                 </div>
@@ -538,7 +534,7 @@ export default function Login() {
                       value={adminUser}
                       onChange={(e) => setAdminUser(e.target.value)}
                       placeholder="invictus"
-                      className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition"
                       required
                     />
                   </div>
@@ -555,13 +551,13 @@ export default function Login() {
                       value={adminPass}
                       onChange={(e) => setAdminPass(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowAdminPass(!showAdminPass)}
-                      className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
+                      className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200"
                     >
                       {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -571,25 +567,25 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 transition disabled:opacity-50"
+                  className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? (
                     <span>Authenticating Medical Officer...</span>
                   ) : (
                     <>
-                      <span>Sign In to Doctor & Admin Hub</span>
+                      <span>Sign In to Doctor &amp; Admin Hub</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
 
                 {/* Quick Auto-Fill Demo Credentials */}
-                <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Demo Doctor: <strong className="text-slate-200">invictus / invictus@11</strong></span>
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Demo Doctor: <strong className="text-teal-300">invictus / invictus@11</strong></span>
                   <button
                     type="button"
                     onClick={() => { setAdminUser("invictus"); setAdminPass("invictus@11") }}
-                    className="text-sky-400 hover:text-sky-300 font-semibold hover:underline"
+                    className="text-teal-400 hover:text-teal-300 font-semibold hover:underline cursor-pointer"
                   >
                     Auto-Fill
                   </button>
@@ -603,7 +599,7 @@ export default function Login() {
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500 space-y-1">
           <p>Sandhi-AI • MDoNER Problem Statement PS 26004</p>
-          <p>Complies with Ayushman Bharat Digital Mission (ABDM) & HIPAA Guidelines</p>
+          <p>Complies with Ayushman Bharat Digital Mission (ABDM) &amp; HIPAA Guidelines</p>
         </div>
       </div>
     </div>

@@ -44,7 +44,7 @@ export function calculate3DMetricAngle(p1, p2, p3) {
 }
 
 // 2. Visibility / Occlusion Gating
-export const VISIBILITY_THRESHOLD = 0.35
+export const VISIBILITY_THRESHOLD = 0.15
 
 export function evaluateLegVisibility(landmarks, side = "auto") {
   if (!landmarks || landmarks.length < 33) {
@@ -62,7 +62,10 @@ export function evaluateLegVisibility(landmarks, side = "auto") {
 
   let chosenSide = side
   if (chosenSide === "auto") {
-    chosenSide = rVis >= lVis ? "right" : "left"
+    // Pick the side that has the highest hip+knee visibility
+    const rScore = (rHip?.visibility ?? 0) + (rKnee?.visibility ?? 0)
+    const lScore = (lHip?.visibility ?? 0) + (lKnee?.visibility ?? 0)
+    chosenSide = rScore >= lScore ? "right" : "left"
   }
 
   const hip = chosenSide === "right" ? rHip : lHip
@@ -75,8 +78,11 @@ export function evaluateLegVisibility(landmarks, side = "auto") {
   const ankleVis = ankle?.visibility ?? 0
 
   // Hip and knee are essential for movement analysis; ankles are often cropped near the floor
-  const isHipKneeVisible = hipVis >= VISIBILITY_THRESHOLD && kneeVis >= VISIBILITY_THRESHOLD
-  const isAnkleVisible = ankleVis >= 0.20
+  // If either right or left leg hip+knee are above threshold, leg tracking is valid
+  const isHipKneeVisible = (hipVis >= VISIBILITY_THRESHOLD && kneeVis >= VISIBILITY_THRESHOLD) ||
+    ((rHip?.visibility ?? 0) >= VISIBILITY_THRESHOLD && (rKnee?.visibility ?? 0) >= VISIBILITY_THRESHOLD) ||
+    ((lHip?.visibility ?? 0) >= VISIBILITY_THRESHOLD && (lKnee?.visibility ?? 0) >= VISIBILITY_THRESHOLD)
+  const isAnkleVisible = ankleVis >= 0.12
   const isOccluded = !isHipKneeVisible
 
   return {

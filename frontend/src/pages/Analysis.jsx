@@ -82,7 +82,7 @@ export default function Analysis() {
     return Math.min(100, Math.round(burstScore + freqScore + rmsScore))
   }, [burstCount, peakFrequency, rmsEnergy])
 
-  // Module 4: Tri-Factor Fusion Engine (Exact Sandy AI Spec)
+  // Module 4: Tri-Factor Fusion Engine (Exact Sandhi AI Spec)
   const fusionResult = useMemo(() => {
     let w_q = 0.30
     let w_cv = 0.35
@@ -299,7 +299,9 @@ export default function Analysis() {
       }
     }
 
-    updateScreeningStep(3, { bursts: burstCount, peakFreq: peakFrequencyHz, rms: rmsVibrationEnergy }, Math.round(hwScore))
+    try {
+      updateScreeningStep(3, { bursts: burstCount, peakFreq: peakFrequency, rms: rmsEnergy }, Math.round(hwScore))
+    } catch (e) {}
     localStorage.setItem("sandhi_fused_result", JSON.stringify(fusedPayload))
     navigate("/results", { state: fusedPayload })
   }
@@ -315,7 +317,7 @@ export default function Analysis() {
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
                 Module 3 &amp; 4: Hardware &amp; Fusion
               </span>
               <span className="text-xs font-bold text-slate-400">
@@ -332,9 +334,9 @@ export default function Analysis() {
 
           <div className="flex items-center gap-3">
             <span className={`px-3.5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase border ${
-              fusionResult.riskCategory === "HIGH" ? "bg-red-950 text-red-400 border-red-800" :
-              fusionResult.riskCategory === "MODERATE" ? "bg-amber-950 text-amber-400 border-amber-800" :
-              "bg-emerald-950 text-emerald-400 border-emerald-800"
+              fusionResult.riskCategory === "HIGH" ? "bg-rose-950 text-rose-300 border-rose-800" :
+              fusionResult.riskCategory === "MODERATE" ? "bg-amber-950 text-amber-300 border-amber-800" :
+              "bg-emerald-950 text-emerald-300 border-emerald-800"
             }`}>
               {fusionResult.riskCategory} RISK &bull; Score: {fusionResult.finalScore}/100
             </span>
@@ -345,10 +347,10 @@ export default function Analysis() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
           
           {/* PILLAR 1: QUESTIONNAIRE WOMAC */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col justify-between">
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-950 text-teal-400 border border-teal-800 uppercase">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800 uppercase">
                   Modality 1: Questionnaire
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-400">Weight: 30%</span>
@@ -360,43 +362,43 @@ export default function Analysis() {
               </div>
 
               {/* Progress */}
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden mb-3">
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
                 <div 
                   className={`h-full rounded-full ${qScore > 60 ? "bg-red-500" : qScore > 35 ? "bg-amber-500" : "bg-emerald-500"}`}
                   style={{ width: `${qScore}%` }}
                 />
               </div>
 
-              <div className="space-y-1.5 text-xs text-slate-300">
+              <div className="space-y-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Pain Subscale:</span>
+                  <span className="text-slate-500">Pain Subscale:</span>
                   <span className="font-bold text-white">{womacBreakdown.pain} / 20.0</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Stiffness Subscale:</span>
+                  <span className="text-slate-500">Stiffness Subscale:</span>
                   <span className="font-bold text-white">{womacBreakdown.stiffness} / 8.0</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Physical Function:</span>
+                  <span className="text-slate-500">Physical Function:</span>
                   <span className="font-bold text-white">{womacBreakdown.function} / 68.0</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-800 text-[11px]">
-                  <span className="text-slate-400">BMI / Occupation:</span>
-                  <span className="font-mono text-teal-300">{riskFactors.bmi} kg/m² &bull; {riskFactors.occupation_flag ? "Manual" : "Sedentary"}</span>
+                  <span className="text-slate-500">BMI / Occupation:</span>
+                  <span className="font-mono text-teal-400">{riskFactors.bmi} kg/m² &bull; {riskFactors.occupation_flag ? "Manual" : "Sedentary"}</span>
                 </div>
               </div>
             </div>
 
-            <p className="text-[10px] text-slate-400 mt-4 pt-3 border-t border-slate-800">
+            <p className="text-[10px] text-slate-500 mt-4 pt-3 border-t border-slate-800">
               {qScore > 50 ? "Elevated morning stiffness & weight-bearing pain" : "Normal joint comfort"}
             </p>
           </div>
 
           {/* PILLAR 2: COMPUTER VISION KINEMATICS */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col justify-between">
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 uppercase">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 uppercase">
                   Modality 2: Computer Vision
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-400">Weight: 35%</span>
@@ -408,43 +410,43 @@ export default function Analysis() {
               </div>
 
               {/* Progress */}
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden mb-3">
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
                 <div 
                   className={`h-full rounded-full ${cvScore > 60 ? "bg-red-500" : cvScore > 35 ? "bg-amber-500" : "bg-emerald-500"}`}
                   style={{ width: `${cvScore}%` }}
                 />
               </div>
 
-              <div className="space-y-1.5 text-xs text-slate-300">
+              <div className="space-y-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">30s Chair Stand:</span>
+                  <span className="text-slate-500">30s Chair Stand:</span>
                   <span className="font-bold text-white">{sitToStandReps} reps (Norm: 14)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Knee ROM:</span>
+                  <span className="text-slate-500">Knee ROM:</span>
                   <span className="font-bold text-white">{romVal}° (Norm: &gt;115°)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Coronal Alignment:</span>
-                  <span className="font-bold text-cyan-300">{varusValgus} ({alignmentRatio})</span>
+                  <span className="text-slate-500">Coronal Alignment:</span>
+                  <span className="font-bold text-cyan-400">{varusValgus} ({alignmentRatio})</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-800 text-[11px]">
-                  <span className="text-slate-400">CV Confidence:</span>
+                  <span className="text-slate-500">CV Confidence:</span>
                   <span className="font-mono text-emerald-400">{Math.round(cvConfidence * 100)}% Landmark Tracking</span>
                 </div>
               </div>
             </div>
 
-            <p className="text-[10px] text-slate-400 mt-4 pt-3 border-t border-slate-800">
+            <p className="text-[10px] text-slate-500 mt-4 pt-3 border-t border-slate-800">
               {sitToStandReps < 8 ? "Severely reduced quadriceps functional power" : "Stable sit-to-stand kinematics"}
             </p>
           </div>
 
           {/* PILLAR 3: HARDWARE ACOUSTIC SENSOR */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col justify-between">
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800 uppercase">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 uppercase">
                   Modality 3: Hardware Sensor
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-400">Weight: 35%</span>
@@ -456,34 +458,34 @@ export default function Analysis() {
               </div>
 
               {/* Progress */}
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden mb-3">
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
                 <div 
                   className={`h-full rounded-full ${hwScore > 60 ? "bg-red-500" : hwScore > 35 ? "bg-amber-500" : "bg-emerald-500"}`}
                   style={{ width: `${hwScore}%` }}
                 />
               </div>
 
-              <div className="space-y-1.5 text-xs text-slate-300">
+              <div className="space-y-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Crepitus Bursts:</span>
+                  <span className="text-slate-500">Crepitus Bursts:</span>
                   <span className="font-bold text-white">{burstCount} bursts / cycle</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Dominant Frequency:</span>
+                  <span className="text-slate-500">Dominant Frequency:</span>
                   <span className="font-bold text-white">{peakFrequency} Hz (Friction band)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">RMS Vibration:</span>
-                  <span className="font-bold text-amber-300">{rmsEnergy} mV</span>
+                  <span className="text-slate-500">RMS Vibration:</span>
+                  <span className="font-bold text-amber-400">{rmsEnergy} mV</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-800 text-[11px]">
-                  <span className="text-slate-400">Crepitus State:</span>
+                  <span className="text-slate-500">Crepitus State:</span>
                   <span className="font-mono text-amber-400">{burstCount >= 6 ? "Severe Wear" : burstCount >= 3 ? "Moderate" : "Smooth Flow"}</span>
                 </div>
               </div>
             </div>
 
-            <p className="text-[10px] text-slate-400 mt-4 pt-3 border-t border-slate-800">
+            <p className="text-[10px] text-slate-500 mt-4 pt-3 border-t border-slate-800">
               {burstCount >= 3 ? "Subchondral bone / cartilage friction detected" : "Laminar synovial fluid articulation"}
             </p>
           </div>
@@ -491,10 +493,10 @@ export default function Analysis() {
         </div>
 
         {/* ── SANDHIBAND HARDWARE OSCILLOSCOPE WAVEFORM SIMULATOR ── */}
-        <div className="mb-6 rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-xl">
+        <div className="mb-6 rounded-3xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-900/40 text-teal-400 border border-teal-700/50 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-teal-950 text-teal-300 border border-teal-800 flex items-center justify-center font-bold">
                 ⚡
               </div>
               <div>
@@ -513,7 +515,7 @@ export default function Analysis() {
                 type="button"
                 onClick={() => handleApplyPreset("smooth")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  sensorPreset === "smooth" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-800 text-slate-400 hover:text-white"
+                  sensorPreset === "smooth" ? "bg-emerald-600 text-white shadow-sm" : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
                 }`}
               >
                 🟢 Smooth Synovial (KL 0-1)
@@ -522,7 +524,7 @@ export default function Analysis() {
                 type="button"
                 onClick={() => handleApplyPreset("moderate")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  sensorPreset === "moderate" ? "bg-amber-600 text-white shadow-xs" : "bg-slate-800 text-slate-400 hover:text-white"
+                  sensorPreset === "moderate" ? "bg-amber-600 text-white shadow-sm" : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
                 }`}
               >
                 🟡 Moderate Crepitus (KL 2)
@@ -531,7 +533,7 @@ export default function Analysis() {
                 type="button"
                 onClick={() => handleApplyPreset("severe")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  sensorPreset === "severe" ? "bg-red-600 text-white shadow-xs" : "bg-slate-800 text-slate-400 hover:text-white"
+                  sensorPreset === "severe" ? "bg-rose-600 text-white shadow-sm" : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
                 }`}
               >
                 🔴 Severe Chondral Wear (KL 3-4)
@@ -541,7 +543,7 @@ export default function Analysis() {
                 type="button"
                 onClick={playCrepitusSound}
                 disabled={isPlayingAudio}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-800/60 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
               >
                 <span>{isPlayingAudio ? "🔊" : "▶"}</span>
                 <span>{isPlayingAudio ? "Playing VAG..." : "Audio Playback"}</span>
@@ -565,7 +567,7 @@ export default function Analysis() {
         </div>
 
         {/* ── FUSION ENGINE SYNTHESIS & EXPLAINABLE REASONING ── */}
-        <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl">
+        <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-8 shadow-xl">
           
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-800">
             <div>
@@ -587,7 +589,7 @@ export default function Analysis() {
               </div>
               <button
                 onClick={handleProceedToResults}
-                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-teal-900/40 flex items-center gap-2 cursor-pointer transition active:scale-[0.99]"
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-sm shadow-[0_0_25px_rgba(20,184,166,0.4)] flex items-center gap-2 cursor-pointer transition"
               >
                 <span>Generate Final Clinical Report</span>
                 <ArrowRight size={16} />
@@ -602,7 +604,7 @@ export default function Analysis() {
             </h4>
             <ul className="space-y-1.5">
               {fusionResult.explanations.map((exp, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-xs text-slate-300">
+                <li key={idx} className="flex items-start gap-2 text-xs text-slate-400">
                   <CheckCircle2 size={14} className="text-teal-400 shrink-0 mt-0.5" />
                   <span>{exp}</span>
                 </li>
@@ -611,10 +613,10 @@ export default function Analysis() {
           </div>
 
           {/* NON-NEGOTIABLE GUARDRAIL: MEDICAL DISCLAIMER */}
-          <div className="mt-6 p-4 rounded-2xl bg-amber-950/40 border border-amber-800/60 flex items-start gap-3">
+          <div className="mt-6 p-4 rounded-2xl bg-amber-950/60 border border-amber-800 flex items-start gap-3">
             <ShieldAlert size={20} className="text-amber-400 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-200 leading-relaxed">
-              <b>Mandatory Clinical Guardrail:</b> Sandy AI is an AI-assisted multi-modal screening tool for early osteoarthritis risk stratification, not a definitive medical diagnosis. If risk is moderate or high, consult an Orthopedic Specialist or Medical Officer for clinical examination and confirmatory radiographic imaging (X-ray).
+              <b className="text-amber-300">Mandatory Clinical Guardrail:</b> Sandhi AI is an AI-assisted multi-modal screening tool for early osteoarthritis risk stratification, not a definitive medical diagnosis. If risk is moderate or high, consult an Orthopedic Specialist or Medical Officer for clinical examination and confirmatory radiographic imaging (X-ray).
             </p>
           </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { addScreening } from "../utils/screeningsStore"
+import { addScreening, updateScreeningStatus } from "../utils/screeningsStore"
 import { useNavigate, useLocation } from "react-router-dom"
 import Navbar from "../components/Navbar"
 import ScreeningStepper from "../components/ScreeningStepper"
@@ -47,6 +47,21 @@ export default function Results() {
 
   const hasSyncedRef = useRef(false)
   const [synced, setSynced] = useState(false)
+  const screeningIdRef = useRef(null) // tracks the ID of the record added to the store
+
+  // Referral / care-plan follow-up state (Part A)
+  const [referralConfirmed, setReferralConfirmed] = useState(() => {
+    // Persist referral confirmation per ABHA across page refreshes
+    try { return localStorage.getItem(`sandhi_referred_${patient.abhaId}`) === "true" } catch { return false }
+  })
+
+  // Role check: only doctors can access /dashboard
+  const isDoctor = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("sandhi_user") || "null")
+      return u?.role === "doctor"
+    } catch { return false }
+  })()
 
   useEffect(() => {
     if (hasSyncedRef.current) return
@@ -90,6 +105,7 @@ export default function Results() {
     }
 
     addScreening(newRecord)
+    screeningIdRef.current = newRecord.id
     updateScreeningStep(4, { compositeScore, riskCategory, klProxy }, compositeScore)
     setSynced(true)
   }, [compositeScore, riskCategory, klProxy, womacScore, reps, rom, alignmentRatio, varusValgus, burstCount, peakFrequency, patient])
@@ -105,7 +121,7 @@ export default function Results() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16 selection:bg-teal-500 selection:text-white">
       <Navbar />
       <ScreeningStepper currentStep={4} />
 
@@ -113,59 +129,61 @@ export default function Results() {
         
         {/* Header */}
         <div className="text-center mb-8">
-          <span className="rounded-full bg-teal-100 text-teal-800 font-bold px-3 py-1 text-xs uppercase tracking-wider">
+          <span className="rounded-full bg-teal-950 text-teal-300 border border-teal-800 font-bold px-3 py-1 text-xs uppercase tracking-wider">
             Screening Protocol Complete &bull; Multi-Modal AI Output
           </span>
-          <h1 className="mt-2 text-3xl font-black text-slate-900">
+          <h1 className="mt-2 text-3xl font-black text-white tracking-tight">
             Osteoarthritis Clinical Risk Evaluation
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-400">
             Patient-specific diagnostic synthesis generated for MDoNER PS 26004
           </p>
         </div>
 
         {/* Real-Time Telemetry Synchronization Notice */}
-        <div className="mb-6 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-200">
+        <div className="mb-6 rounded-2xl bg-teal-950/60 border border-teal-800 p-4 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-teal-200">
           <div className="flex items-center gap-3">
             <span className="flex h-3 w-3 relative shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-400"></span>
             </span>
             <div>
               <p className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-                <span>⚡ Automatically Synchronized with Doctor & Admin Hub</span>
-                <span className="text-[10px] bg-emerald-900 px-2 py-0.5 rounded-full border border-emerald-700 text-emerald-300 font-mono">LIVE SYNC</span>
+                <span>⚡ Automatically Synchronized with Doctor &amp; Admin Hub</span>
+                <span className="text-[10px] bg-teal-900 px-2 py-0.5 rounded-full border border-teal-700 text-teal-300 font-mono font-semibold">LIVE SYNC</span>
               </p>
-              <p className="text-[11px] text-emerald-300 mt-0.5">
+              <p className="text-[11px] text-slate-300 mt-0.5">
                 Screening biomarkers for <b>{patient.name}</b> (ABHA: {patient.abhaId || "14-xxxx"}) are now immediately viewable in the clinical command dashboard.
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate("/")}
-            className="shrink-0 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md cursor-pointer flex items-center gap-1"
-          >
-            <span>Inspect in Admin Hub →</span>
-          </button>
+          {isDoctor && (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="shrink-0 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1"
+            >
+              <span>Inspect in Doctor Hub →</span>
+            </button>
+          )}
         </div>
 
         {/* Patient Bar */}
-        <div className="rounded-2xl bg-white border border-slate-200 p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-xs">
+        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-md">
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-lg font-bold text-slate-900">{patient.name}</p>
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-medium">
+              <p className="text-lg font-bold text-white">{patient.name}</p>
+              <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-300 font-medium border border-slate-700">
                 {patient.age}y &bull; {patient.gender}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              ABHA: <b className="font-mono text-slate-700">{patient.abhaId || "14-5829-1029-4821"}</b> &bull; {patient.joint || "Right Knee"} &bull; {patient.district}, {patient.state}
+            <p className="text-xs text-slate-400 mt-1">
+              ABHA: <b className="font-mono text-teal-300">{patient.abhaId || "14-5829-1029-4821"}</b> &bull; {patient.joint || "Right Knee"} &bull; {patient.district}, {patient.state}
             </p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleDownloadPDF}
-              className="rounded-xl border border-teal-600 bg-teal-50 px-4 py-2.5 text-xs font-bold text-teal-800 hover:bg-teal-100 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="rounded-xl border border-teal-700 bg-slate-800 px-4 py-2.5 text-xs font-bold text-teal-300 hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <span>📄</span>
               <span>{downloading ? "Generating PDF..." : "Export Clinical PDF"}</span>
@@ -174,23 +192,23 @@ export default function Results() {
         </div>
 
         {/* Score Card */}
-        <div className="rounded-2xl bg-white border border-slate-200 p-8 text-center shadow-xs">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-8 text-center shadow-xl">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
             Patient Multi-Modal Composite Risk Score
           </p>
 
           <p className={`mt-3 text-7xl font-black font-mono tracking-tight ${
-            riskCategory === "HIGH" ? "text-red-600" :
-            riskCategory === "MODERATE" ? "text-orange-600" : "text-emerald-600"
+            riskCategory === "HIGH" ? "text-rose-500" :
+            riskCategory === "MODERATE" ? "text-amber-400" : "text-emerald-400"
           }`}>
             {compositeScore}
-            <span className="text-2xl text-slate-400 font-normal"> / 100</span>
+            <span className="text-2xl text-slate-500 font-normal"> / 100</span>
           </p>
 
           <div className="mt-3 flex justify-center">
-            <span className={`px-5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase ${
-              riskCategory === "HIGH" ? "bg-red-100 text-red-700 border border-red-200" :
-              riskCategory === "MODERATE" ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+            <span className={`px-5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase border ${
+              riskCategory === "HIGH" ? "bg-rose-950 text-rose-300 border-rose-800" :
+              riskCategory === "MODERATE" ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-emerald-950 text-emerald-300 border-emerald-800"
             }`}>
               {riskCategory} RISK &bull; KELLGREN-LAWRENCE GRADE {klProxy} PROXY
             </span>
@@ -198,9 +216,9 @@ export default function Results() {
 
           {/* Color Gradient Track */}
           <div className="mx-auto mt-6 max-w-md">
-            <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden flex">
+            <div className="h-3 w-full rounded-full bg-slate-800 overflow-hidden flex border border-slate-700">
               <div className="h-full bg-emerald-500" style={{ width: "35%" }} />
-              <div className="h-full bg-orange-400" style={{ width: "30%" }} />
+              <div className="h-full bg-amber-400" style={{ width: "30%" }} />
               <div className="h-full bg-rose-500" style={{ width: "35%" }} />
             </div>
             <div className="mt-1 flex justify-between text-[10px] font-mono text-slate-400">
@@ -211,56 +229,56 @@ export default function Results() {
             </div>
           </div>
 
-          <p className="mx-auto mt-4 max-w-lg text-xs text-slate-500 leading-relaxed">
+          <p className="mx-auto mt-4 max-w-lg text-xs text-slate-400 leading-relaxed">
             Composite evaluation fuses MediaPipe 30s chair stand kinematics, SandhiBand™ VAG acoustic friction micro-bursts, clinical WOMAC index, and anatomical knee axis ratios.
           </p>
         </div>
 
-        {/* Sandy AI 3-Pillar Sub-Score Breakdown */}
-        <div className="mt-6 rounded-2xl bg-white border border-slate-200 p-6 shadow-xs">
+        {/* Sandhi AI 3-Pillar Sub-Score Breakdown */}
+        <div className="mt-6 rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Sandy AI — Tri-Factor Multimodal Sub-Scores
+            <h3 className="text-base font-bold text-white">
+              Sandhi AI — Tri-Factor Multimodal Sub-Scores
             </h3>
-            <span className="text-xs font-mono font-bold text-slate-500">
+            <span className="text-xs font-mono font-bold text-slate-400">
               Final = (0.30 × Q) + (0.35 × CV) + (0.35 × HW)
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-bold text-teal-700 uppercase">1. Questionnaire (30%)</span>
-                <span className="text-sm font-black text-slate-900 font-mono">{triFactor.questionnaire_score ?? womacScore}/100</span>
+                <span className="text-[11px] font-bold text-teal-400 uppercase">1. Questionnaire (30%)</span>
+                <span className="text-sm font-black text-white font-mono">{triFactor.questionnaire_score ?? womacScore}/100</span>
               </div>
-              <p className="text-[11px] text-slate-500">WOMAC pain, stiffness & physical function scale</p>
+              <p className="text-[11px] text-slate-400">WOMAC pain, stiffness &amp; physical function scale</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-bold text-cyan-700 uppercase">2. CV Kinematics (35%)</span>
-                <span className="text-sm font-black text-slate-900 font-mono">{triFactor.cv_score ?? (reps < 8 ? 72 : 40)}/100</span>
+                <span className="text-[11px] font-bold text-cyan-400 uppercase">2. CV Kinematics (35%)</span>
+                <span className="text-sm font-black text-white font-mono">{triFactor.cv_score ?? (reps < 8 ? 72 : 40)}/100</span>
               </div>
-              <p className="text-[11px] text-slate-500">{reps} chair stands in 30s &bull; {rom}° ROM</p>
+              <p className="text-[11px] text-slate-400">{reps} chair stands in 30s &bull; {rom}° ROM</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-bold text-amber-700 uppercase">3. Hardware Sensor (35%)</span>
-                <span className="text-sm font-black text-slate-900 font-mono">{triFactor.hardware_score ?? (burstCount >= 5 ? 65 : 35)}/100</span>
+                <span className="text-[11px] font-bold text-amber-400 uppercase">3. Hardware Sensor (35%)</span>
+                <span className="text-sm font-black text-white font-mono">{triFactor.hardware_score ?? (burstCount >= 5 ? 65 : 35)}/100</span>
               </div>
-              <p className="text-[11px] text-slate-500">{burstCount} VAG bursts &bull; {peakFrequency} Hz peak</p>
+              <p className="text-[11px] text-slate-400">{burstCount} VAG bursts &bull; {peakFrequency} Hz peak</p>
             </div>
           </div>
         </div>
 
-        {/* Diagnostic Factor Breakdown (Now 100% Dynamic!) */}
-        <div className="mt-6 rounded-2xl bg-white border border-slate-200 p-6 shadow-xs space-y-4">
+        {/* Diagnostic Factor Breakdown */}
+        <div className="mt-6 rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-md space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">
+            <h3 className="text-base font-bold text-white">
               Diagnostic Biomarker Breakdown for {patient.name}
             </h3>
-            <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+            <span className="text-xs font-bold text-teal-300 bg-teal-950 px-2.5 py-1 rounded-md border border-teal-800">
               Calibrated Values
             </span>
           </div>
@@ -268,18 +286,18 @@ export default function Results() {
           <div className="grid gap-3 sm:grid-cols-2">
             
             {/* 1. Range of Motion */}
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 flex items-start gap-3">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4 flex items-start gap-3">
               <span className="text-xl">📐</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-slate-900">Knee Range of Motion (ROM)</p>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    rom < 75 ? "bg-red-100 text-red-700" : rom < 100 ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                  <p className="text-xs font-bold text-white">Knee Range of Motion (ROM)</p>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                    rom < 75 ? "bg-rose-950 text-rose-300 border-rose-800" : rom < 100 ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-emerald-950 text-emerald-300 border-emerald-800"
                   }`}>
                     {rom}°
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   {rom < 75 
                     ? `Severe functional ROM restriction (${rom}°). Flexion contracture and significant terminal extension lag.`
                     : rom < 100 
@@ -291,18 +309,18 @@ export default function Results() {
             </div>
 
             {/* 2. SandhiBand VAG Crepitus */}
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 flex items-start gap-3">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4 flex items-start gap-3">
               <span className="text-xl">⚡</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-slate-900">SandhiBand™ VAG Crepitus</p>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    burstCount >= 6 ? "bg-red-100 text-red-700" : burstCount >= 3 ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                  <p className="text-xs font-bold text-white">SandhiBand™ VAG Crepitus</p>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                    burstCount >= 6 ? "bg-rose-950 text-rose-300 border-rose-800" : burstCount >= 3 ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-emerald-950 text-emerald-300 border-emerald-800"
                   }`}>
                     {burstCount} Bursts &bull; {peakFrequency} Hz
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   {burstCount >= 6 
                     ? `Coarse high-frequency acoustic micro-bursts indicate significant articular cartilage erosion and bone-on-bone friction.`
                     : burstCount >= 3 
@@ -314,22 +332,22 @@ export default function Results() {
             </div>
 
             {/* 3. 30-Second Chair Stand Repetitions */}
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 flex items-start gap-3">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4 flex items-start gap-3">
               <span className="text-xl">🪑</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-slate-900">30s Chair Stand Test (CST)</p>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    reps < 6 ? "bg-red-100 text-red-700" : reps < 10 ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                  <p className="text-xs font-bold text-white">30s Chair Stand Test (CST)</p>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                    reps < 6 ? "bg-rose-950 text-rose-300 border-rose-800" : reps < 10 ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-emerald-950 text-emerald-300 border-emerald-800"
                   }`}>
                     {reps} Reps
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   {reps < 6 
                     ? `Severely reduced lower extremity quadriceps power (${reps} reps). High functional fall risk.`
                     : reps < 10 
-                    ? `Mild-to-moderate quadriceps weakness (${reps} reps). Patient required extended recovery time per stand.`
+                    ? `Mild-to-moderate quadriceps weakness (${reps} reps). Extended recovery time per cycle.`
                     : `Optimal quadriceps endurance and balance (${reps} reps completed with stable cadence).`
                   }
                 </p>
@@ -337,18 +355,18 @@ export default function Results() {
             </div>
 
             {/* 4. Joint Alignment Ratio */}
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 flex items-start gap-3">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4 flex items-start gap-3">
               <span className="text-xl">⚖️</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-slate-900">Knee Anatomical Alignment</p>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    varusValgus !== "Normal" ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                  <p className="text-xs font-bold text-white">Knee Anatomical Alignment</p>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                    varusValgus !== "Normal" ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-emerald-950 text-emerald-300 border-emerald-800"
                   }`}>
                     {varusValgus} (Ratio: {alignmentRatio})
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   {varusValgus === "Varus" 
                     ? `Bow-leg varus angulation (ratio ${alignmentRatio} > 1.3) multiplies compressive forces on medial joint compartment.`
                     : varusValgus === "Valgus" 
@@ -362,82 +380,186 @@ export default function Results() {
           </div>
         </div>
 
-        {/* Clinical Referral Plan Tailored to Patient Risk */}
-        <div className={`mt-6 rounded-2xl p-6 shadow-xs border ${
-          riskCategory === "HIGH" ? "border-rose-200 bg-rose-50/70 text-rose-950" :
-          riskCategory === "MODERATE" ? "border-amber-200 bg-amber-50/70 text-amber-950" :
-          "border-emerald-200 bg-emerald-50/70 text-emerald-950"
-        }`}>
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold">
-              {riskCategory === "HIGH" ? "🚨 Priority Orthopedic Clinical Referral" :
-               riskCategory === "MODERATE" ? "🩺 Sub-Centre / PHC Physiotherapy Care Pathway" :
-               "🌿 Community Health & Prevention Guidance"}
-            </h3>
-            <span className="text-xs font-black uppercase tracking-wider">
-              Protocol: {riskCategory} Risk
-            </span>
-          </div>
+        {/* ── PART A: CLINIC REFERRAL PANEL (HIGH / MODERATE risk only) ── */}
+        {riskCategory !== "LOW" && (
+          <div className={`mt-6 rounded-2xl p-6 shadow-md border ${
+            riskCategory === "HIGH" 
+              ? "border-rose-800 bg-rose-950/60" 
+              : "border-amber-800 bg-amber-950/60"
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+              <div>
+                <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  riskCategory === "HIGH" ? "bg-rose-900/80 text-rose-300 border-rose-700" : "bg-amber-900/80 text-amber-300 border-amber-700"
+                }`}>
+                  {riskCategory === "HIGH" ? "🚨 Priority Referral" : "🩺 Clinical Assessment Recommended"}
+                </span>
+                <h3 className={`mt-2 text-lg font-black ${riskCategory === "HIGH" ? "text-rose-200" : "text-amber-200"}`}>
+                  Elevated OA Risk Markers Detected
+                </h3>
+                <p className={`text-xs mt-0.5 ${riskCategory === "HIGH" ? "text-rose-300" : "text-amber-300"}`}>
+                  Clinical assessment recommended. A healthcare professional will review your results and guide the next steps.
+                </p>
+              </div>
+              {referralConfirmed && (
+                <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs font-bold">
+                  ✅ Referral Confirmed
+                </span>
+              )}
+            </div>
 
-          <ul className="mt-3.5 space-y-2.5 text-xs">
-            {riskCategory === "HIGH" ? (
-              <>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-red-700 text-sm">&bull;</span>
-                  <span><b>Tertiary Referral:</b> Fast-track appointment at GMCH Guwahati / RIMS Imphal Orthopedic Department for radiographic Kellgren-Lawrence staging.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-red-700 text-sm">&bull;</span>
-                  <span><b>Viscosupplementation & Pain Management:</b> Evaluate candidate suitability for intra-articular hyaluronic acid or corticosteroid infiltration.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-red-700 text-sm">&bull;</span>
-                  <span><b>Terrain Unloading:</b> Provide supportive unloader knee brace and walking aid to alleviate steep terrace farming stress.</span>
-                </li>
-              </>
-            ) : riskCategory === "MODERATE" ? (
-              <>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-amber-700 text-sm">&bull;</span>
-                  <span><b>Community Physiotherapy:</b> Supervised isometric quadriceps strengthening and hamstring stretching 4 times weekly.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-amber-700 text-sm">&bull;</span>
-                  <span><b>Weight Management & Ergonomics:</b> Recommend joint-friendly seated workstations during agricultural sorting/tea garden duties.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-amber-700 text-sm">&bull;</span>
-                  <span><b>Quarterly ASHA Telemetry:</b> Repeat 30s chair stand and SandhiBand acoustic crepitus re-evaluation in 90 days.</span>
-                </li>
-              </>
+            {/* Nearest Facility Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {riskCategory === "HIGH" ? (
+                <>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">🏥</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Tertiary Orthopedic Centre</p>
+                      <p className="text-xs text-slate-300">GMCH Guwahati — Orthopedic OPD</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">📍 Bhangagarh, Guwahati, Assam</p>
+                      <p className="text-[10px] text-slate-400">Radiographic K-L staging + specialist consultation</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">🏥</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Tertiary Orthopedic Centre</p>
+                      <p className="text-xs text-slate-300">RIMS Imphal — Orthopedic Department</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">📍 Lamphelpat, Imphal, Manipur</p>
+                      <p className="text-[10px] text-slate-400">Arthroscopy evaluation + viscosupplementation</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">📱</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Teleconsultation Available</p>
+                      <p className="text-xs text-slate-300">eSanjeevani Orthopaedic Tele-OPD</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">Mon–Sat, 9 AM – 1 PM</p>
+                      <p className="text-[10px] text-slate-400">Connect from your nearest civil hospital or health centre</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">🏥</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Nearest Civil Hospital</p>
+                      <p className="text-xs text-slate-300">District-Level Government Hospital</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">📍 Ask ASHA worker for nearest civil hospital</p>
+                      <p className="text-[10px] text-slate-400">Pain management + urgent upward referral letter</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">🏥</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Nearest Civil Hospital</p>
+                      <p className="text-xs text-slate-300">Supervised quadriceps physiotherapy program</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">📍 Contact nearest civil hospital in your district</p>
+                      <p className="text-[10px] text-slate-400">4× weekly supervised physiotherapy sessions</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3.5 flex items-start gap-3 shadow-md">
+                    <span className="text-xl shrink-0">📱</span>
+                    <div>
+                      <p className="text-xs font-bold text-white">Teleconsultation Available</p>
+                      <p className="text-xs text-slate-300">eSanjeevani Physiotherapy Tele-OPD</p>
+                      <p className="text-[11px] text-teal-400 font-semibold mt-1">Mon–Fri, 10 AM – 4 PM</p>
+                      <p className="text-[10px] text-slate-400">Remote follow-up for rural patients who cannot travel</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Confirm Referral CTA */}
+            {!referralConfirmed ? (
+              <button
+                onClick={() => {
+                  setReferralConfirmed(true)
+                  try { localStorage.setItem(`sandhi_referred_${patient.abhaId}`, "true") } catch {}
+                  if (screeningIdRef.current) {
+                    updateScreeningStatus(screeningIdRef.current, riskCategory === "HIGH" ? "Referred to Tertiary Centre" : "Referred to Civil Hospital", null)
+                  }
+                }}
+                className={`mt-4 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer shadow-md ${
+                  riskCategory === "HIGH" ? "bg-rose-600 hover:bg-rose-500 text-white" : "bg-amber-600 hover:bg-amber-500 text-white"
+                }`}
+              >
+                ✅ Confirm Referral &amp; Notify Doctor Hub
+              </button>
             ) : (
-              <>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-emerald-700 text-sm">&bull;</span>
-                  <span><b>Preventive Joint Health:</b> Maintain regular low-impact aerobic walking and aquatic/cycling exercises.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-emerald-700 text-sm">&bull;</span>
-                  <span><b>Dietary & Hydration Education:</b> Anti-inflammatory diet rich in calcium and vitamin D suited to North Eastern regional cuisine.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold text-emerald-700 text-sm">&bull;</span>
-                  <span><b>Annual Health Check:</b> Schedule routine community screening in 12 months.</span>
-                </li>
-              </>
+              <p className="mt-4 text-xs text-emerald-400 font-semibold">
+                ✅ Referral confirmed. Your results have been sent to the Doctor &amp; MDoNER Command Hub for review. The healthcare worker will create a care plan for you.
+              </p>
             )}
-          </ul>
+          </div>
+        )}
+
+        {/* LOW RISK: Preventive Guidance */}
+        {riskCategory === "LOW" && (
+          <div className="mt-6 rounded-2xl p-6 shadow-md border border-emerald-800 bg-emerald-950/60">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-emerald-200">🌿 Community Health &amp; Prevention Guidance</h3>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400">Protocol: LOW Risk</span>
+            </div>
+            <ul className="mt-3.5 space-y-2.5 text-xs text-slate-300">
+              <li className="flex items-start gap-2"><span className="font-bold text-emerald-400 text-sm">&bull;</span><span><b className="text-white">Preventive Joint Health:</b> Maintain regular low-impact aerobic walking and aquatic/cycling exercises.</span></li>
+              <li className="flex items-start gap-2"><span className="font-bold text-emerald-400 text-sm">&bull;</span><span><b className="text-white">Dietary &amp; Hydration Education:</b> Anti-inflammatory diet rich in calcium and vitamin D suited to North Eastern regional cuisine.</span></li>
+              <li className="flex items-start gap-2"><span className="font-bold text-emerald-400 text-sm">&bull;</span><span><b className="text-white">Annual Health Check:</b> Schedule routine community screening in 12 months.</span></li>
+            </ul>
+            <button onClick={() => navigate("/screening")} className="mt-4 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition cursor-pointer shadow-md">
+              📅 Schedule Annual Reassessment
+            </button>
+          </div>
+        )}
+
+        {/* ── PART A: FOLLOW-UP / RE-ASSESSMENT PANEL (all risk levels) ── */}
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white">🔁 Follow-up &amp; Re-assessment</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {riskCategory === "HIGH"
+                  ? "Your doctor will schedule a follow-up after reviewing your referral. When the date arrives, begin a new screening session to track your progress."
+                  : riskCategory === "MODERATE"
+                  ? "A 90-day re-assessment is recommended. Your healthcare worker will confirm the date once they create your care plan."
+                  : "An annual re-assessment is recommended to confirm your joint health remains stable."}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Recommended Next Screening</p>
+              <p className="text-sm font-black text-teal-400 font-mono">
+                {riskCategory === "HIGH" ? "After Doctor Review" : riskCategory === "MODERATE" ? "90 Days" : "12 Months"}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center gap-3">
+            <button
+              onClick={() => {
+                localStorage.removeItem("sandhi_patient")
+                localStorage.removeItem("sandhi_womac")
+                localStorage.removeItem("sandhi_movement")
+                navigate("/registration")
+              }}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+            >
+              🔁 Begin Re-assessment Now
+            </button>
+            <p className="text-[11px] text-slate-400 text-center sm:text-left">
+              Starts a fresh screening session. Previous results remain visible in the Doctor Hub.
+            </p>
+          </div>
         </div>
 
         {/* MANDATORY GUARDRAIL: CLINICAL DISCLAIMER */}
-        <div className="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-4.5 text-amber-900 flex items-start gap-3 shadow-xs">
+        <div className="mt-6 rounded-2xl bg-amber-950/60 border border-amber-800 p-4 text-amber-200 flex items-start gap-3 shadow-md">
           <span className="text-xl shrink-0">⚠️</span>
           <div>
-            <p className="text-xs font-bold text-amber-950 uppercase tracking-wide">
-              Mandatory Clinical Screening Guardrail
-            </p>
-            <p className="text-xs text-amber-900 mt-1 leading-relaxed">
-              Sandy AI is an AI-assisted early risk screening tool, not a definitive medical diagnosis. If your risk is moderate or high, consult a qualified Orthopedic Specialist or Medical Officer for clinical examination and confirmatory radiographic imaging (X-ray).
+            <p className="text-xs font-bold text-amber-300 uppercase tracking-wide">Mandatory Clinical Screening Guardrail</p>
+            <p className="text-xs text-amber-200 mt-1 leading-relaxed">
+              Sandhi AI is an AI-assisted early risk screening tool, not a definitive medical diagnosis. If your risk is moderate or high, consult a qualified Orthopedic Specialist or Medical Officer for clinical examination and confirmatory radiographic imaging (X-ray).
             </p>
           </div>
         </div>
@@ -445,20 +567,15 @@ export default function Results() {
         {/* Action Buttons */}
         <div className="mt-6 flex flex-col sm:flex-row justify-between gap-3">
           <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/screening")}
-              className="rounded-xl bg-slate-900 border border-slate-700 px-5 py-2.5 text-xs font-bold text-teal-400 hover:bg-slate-800 transition cursor-pointer flex items-center gap-1.5"
-            >
+            <button onClick={() => navigate("/screening")} className="rounded-xl bg-slate-800 border border-slate-700 px-5 py-2.5 text-xs font-bold text-teal-300 hover:bg-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-sm">
               ← Screening Hub
             </button>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="rounded-xl border border-slate-300 px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-            >
-              Doctor Hub
-            </button>
+            {isDoctor && (
+              <button onClick={() => navigate("/dashboard")} className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 transition cursor-pointer shadow-sm">
+                Doctor Hub
+              </button>
+            )}
           </div>
-
           <div className="flex gap-2">
             <button
               onClick={() => {
@@ -467,7 +584,7 @@ export default function Results() {
                 localStorage.removeItem("sandhi_movement")
                 navigate("/registration")
               }}
-              className="rounded-xl bg-teal-700 px-6 py-3 text-xs font-bold text-white hover:bg-teal-800 transition cursor-pointer shadow-sm"
+              className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 px-6 py-3 text-xs font-bold text-white transition cursor-pointer shadow-md"
             >
               + Start Next Patient Screening
             </button>

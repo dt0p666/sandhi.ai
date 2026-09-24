@@ -71,6 +71,7 @@ export default function MovementAnalysis() {
   // Clinical Profile & Biomechanical States (Dynamic Testing)
   const [clinicalProfile, setClinicalProfile] = useState("moderate") // 'healthy' | 'moderate' | 'severe'
   const [kneeAngle, setKneeAngle] = useState(165)
+  const [liveFlexionAngle, setLiveFlexionAngle] = useState(15) // Clinical flexion: 0° = straight, ~90° = seated, increases as knee bends
   const [minFlexion, setMinFlexion] = useState(88)
   const [maxExtension, setMaxExtension] = useState(168)
   const [sitToStandState, setSitToStandState] = useState("STANDING") // 'STANDING' or 'SITTING'
@@ -96,6 +97,14 @@ export default function MovementAnalysis() {
   const kneeAngleRef = useRef(kneeAngle)
   const lastMediaPipeAngleTimeRef = useRef(0)
   const processFrameRef = useRef(null)
+
+  // repPhaseRef tracks state in the knee flexion cycle: "IDLE", "EXTENDED", "FLEXED"
+  const repPhaseRef = useRef("IDLE")
+  // Records timestamp when the knee last crossed the extension threshold (≥140°).
+  // Used to reject jitter crossings that happen impossibly fast (< 400ms).
+  const lastExtensionTimeRef = useRef(0)
+  // Real-time camera positioning guidance message (empty = all good, shown = user needs to reposition)
+  const [cameraGuidance, setCameraGuidance] = useState("")
 
   useEffect(() => {
     isTestStartedRef.current = isTestStarted
@@ -241,6 +250,12 @@ export default function MovementAnalysis() {
     setIsTestStarted(false)
     isTestStartedRef.current = false
     lastPostureRef.current = "SITTING"
+    // Reset knee rep cycle state machine so test starts fresh
+    repPhaseRef.current = "IDLE"
+    lastExtensionTimeRef.current = 0
+    repCooldownRef.current = 0
+    // Reset temporal filter so prior session angle doesn't bleed in
+    if (temporalFilterRef.current) temporalFilterRef.current.reset()
     playPleasantChime()
     setCountdown(3)
 
@@ -323,8 +338,38 @@ export default function MovementAnalysis() {
 
     // 1. Occlusion / Visibility Gating
     const visEval = evaluateLegVisibility(results.poseLandmarks, "auto")
+
+    // ── CAMERA GUIDANCE (Part B): compute actionable message before gating ──
+    // Check raw landmark confidences for hip, knee, ankle on the auto-selected side
+    const hipVis = visEval.hipVis ?? 0
+    const kneeVis = visEval.kneeVis ?? 0
+    const ankleVis = visEval.ankleVis ?? 0
+    const avgLegVis = (hipVis + kneeVis + ankleVis) / 3
+
+    let guidanceMsg = ""
+    if (!visEval.isValid) {
+      if (kneeVis < 0.35 && hipVis > 0.4) {
+        guidanceMsg = "🦵 Move back — your full leg isn't visible. Step away from camera."
+      } else if (kneeVis < 0.35) {
+        guidanceMsg = "🦵 Knee not detected — stand sideways to the camera for best tracking."
+      } else if (hipVis < 0.35) {
+        guidanceMsg = "🏃 Move back so your hip and knee are both in frame."
+      } else {
+        guidanceMsg = "⚠ Keep your hip and knee in view during the exercise."
+      }
+    } else if (avgLegVis < 0.45) {
+      guidanceMsg = "💡 Step into better light — landmark confidence is low."
+    } else if (ankleVis < 0.20 && kneeVis > 0.5) {
+      guidanceMsg = "📐 Try to keep your ankle in frame for the most accurate knee angle."
+    }
+    setCameraGuidance(guidanceMsg)
+
     if (!visEval.isValid) {
       setOcclusionWarning("⚠️ Occlusion Gated: Keep hip and knee in view")
+      // If landmark confidence drops during an active rep cycle, reset phase to avoid false counting
+      if (repPhaseRef.current === "NEED_FLEXION") {
+        repPhaseRef.current = "NEED_EXTENSION"
+      }
       return
     } else {
       setOcclusionWarning("")
@@ -356,28 +401,67 @@ export default function MovementAnalysis() {
       kneeAngleRef.current = smoothedAngle
       lastMediaPipeAngleTimeRef.current = Date.now()
       setKneeAngle(smoothedAngle)
+      // Clinical flexion convention: 0° = fully extended/straight, increases as knee bends
+      setLiveFlexionAngle(Math.max(0, Math.round(180 - smoothedAngle)))
       setMinFlexion(prev => Math.min(prev, smoothedAngle))
       setMaxExtension(prev => Math.max(prev, smoothedAngle))
 
-      // 5. Hysteresis State Machine for Sit/Stand Transitions (CDC / ACR Chair Stand Standard)
-      if (smoothedAngle >= 140 && lastPostureRef.current !== "STANDING") {
+      // 5. Knee Flexion Rep Detection State Machine
+      // Uses the live flexion angle displayed to the user:
+      // liveFlexionAngle: 0° = straight leg (standing), ~90°+ = bent leg (seated / flexed)
+      // Cycle: FLEXED (flexion >= 46°) -> EXTENDED (flexion <= 40°) -> REP + 1
+      const currentFlex = Math.max(0, Math.round(180 - smoothedAngle))
+      const now = Date.now()
+
+      // Diagnostic logging for developer/clinician verification
+      if (!window.__lastRepLogTime || now - window.__lastRepLogTime > 500) {
+        console.log(`[Sandhi KneeRep] Flexion: ${currentFlex}° | JointAngle: ${Math.round(smoothedAngle)}° | State: ${repPhaseRef.current} | Reps: ${repCountRef.current} | TestStarted: ${isTestStartedRef.current}`)
+        window.__lastRepLogTime = now
+      }
+
+      // Initialize state if IDLE
+      if (repPhaseRef.current === "IDLE") {
+        if (currentFlex >= 28) {
+          repPhaseRef.current = "FLEXED"
+          setSitToStandState("SITTING")
+          lastPostureRef.current = "SITTING"
+        } else if (currentFlex <= 22) {
+          repPhaseRef.current = "EXTENDED"
+          setSitToStandState("STANDING")
+          lastPostureRef.current = "STANDING"
+        }
+      }
+
+      if (currentFlex <= 22) {
+        // Knee is straight / extended (standing position)
         setSitToStandState("STANDING")
         lastPostureRef.current = "STANDING"
-        playPleasantChime()
-      } else if (smoothedAngle <= 124 && lastPostureRef.current === "STANDING") {
+
+        if (repPhaseRef.current === "FLEXED") {
+          // Completed the cycle: was bent, now straightened back up!
+          const timeSinceCooldown = now - repCooldownRef.current
+          if (timeSinceCooldown > 500 && !testCompleteRef.current) {
+            repCooldownRef.current = now
+            repPhaseRef.current = "EXTENDED"
+            setRepCount(prev => {
+              const next = Math.min(10, prev + 1)
+              repCountRef.current = next
+              console.log(`[Sandhi KneeRep] 🎯 REP INCREMENTED -> ${next} (from knee flexion: ${currentFlex}°)`)
+              playPleasantChime()
+              speakRepPraise(next, selectedLangRef.current)
+              return next
+            })
+          } else {
+            repPhaseRef.current = "EXTENDED"
+          }
+        } else {
+          repPhaseRef.current = "EXTENDED"
+        }
+      } else if (currentFlex >= 28) {
+        // Knee is bent / flexed past flexion threshold (seated position)
         setSitToStandState("SITTING")
         lastPostureRef.current = "SITTING"
-        const now = Date.now()
-        if (isTestStartedRef.current && !testCompleteRef.current && now - repCooldownRef.current > 600) {
-          repCooldownRef.current = now
-          setRepCount(prev => {
-            const next = Math.min(10, prev + 1)
-            repCountRef.current = next
-            playPleasantChime()
-            speakRepPraise(next, selectedLangRef.current)
-            return next
-          })
-        }
+        repPhaseRef.current = "FLEXED"
       }
     }
   }
@@ -660,24 +744,30 @@ export default function MovementAnalysis() {
       currentPosture = "SITTING"
     }
 
-    // State Transition & Rep Counting (Works seamlessly with live webcam and simulation!)
-    if (currentPosture === "STANDING" && lastPostureRef.current === "SITTING") {
-      lastPostureRef.current = "STANDING"
-      setSitToStandState("STANDING")
-    } else if (currentPosture === "SITTING" && lastPostureRef.current === "STANDING") {
-      lastPostureRef.current = "SITTING"
-      setSitToStandState("SITTING")
+    const isLiveMediaPipeActive = isLiveWebcam && (Date.now() - lastMediaPipeAngleTimeRef.current < 1000)
 
-      const now = Date.now()
-      if (isTestStartedRef.current && !testCompleteRef.current && now - repCooldownRef.current > 600) {
-        repCooldownRef.current = now
-        setRepCount((prevReps) => {
-          const nextReps = Math.min(10, prevReps + 1)
-          repCountRef.current = nextReps
-          playPleasantChime()
-          speakRepPraise(nextReps, selectedLangRef.current)
-          return nextReps
-        })
+    // State Transition & Rep Counting
+    // When MediaPipe is active, knee goniometry drives rep counting in handleMediaPipeResults.
+    // When MediaPipe is NOT delivering angles (simulation, or webcam cropped above knees),
+    // optical elevation tracking provides seamless, reliable sit-to-stand rep counting!
+    if (currentPosture !== lastPostureRef.current) {
+      const prevPosture = lastPostureRef.current
+      lastPostureRef.current = currentPosture
+      setSitToStandState(currentPosture)
+
+      if (currentPosture === "STANDING" && prevPosture === "SITTING") {
+        const now = Date.now()
+        if (!testCompleteRef.current && now - repCooldownRef.current > 500) {
+          repCooldownRef.current = now
+          setRepCount((prevReps) => {
+            const nextReps = Math.min(10, prevReps + 1)
+            repCountRef.current = nextReps
+            console.log(`[Sandhi ElevationRep] 🎯 REP INCREMENTED -> ${nextReps} (from body elevation)`)
+            playPleasantChime()
+            speakRepPraise(nextReps, selectedLangRef.current)
+            return nextReps
+          })
+        }
       }
     }
 
@@ -687,11 +777,11 @@ export default function MovementAnalysis() {
     const highAngle = profile === "healthy" ? 174 : profile === "severe" ? 148 : 166
     const currentFlexAngle = Math.round(lowAngle + elevation * (highAngle - lowAngle))
 
-    const isLiveMediaPipeActive = isLiveWebcam && (Date.now() - lastMediaPipeAngleTimeRef.current < 1000)
     const displayAngle = isLiveMediaPipeActive ? (kneeAngleRef.current || currentFlexAngle) : currentFlexAngle
 
     if (!isLiveMediaPipeActive) {
       setKneeAngle(currentFlexAngle)
+      setLiveFlexionAngle(Math.max(0, Math.round(180 - currentFlexAngle)))
       setMinFlexion(prev => Math.min(prev, currentFlexAngle))
       setMaxExtension(prev => Math.max(prev, currentFlexAngle))
     }
@@ -818,7 +908,7 @@ export default function MovementAnalysis() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       <Navbar />
       <ScreeningStepper currentStep={2} />
 
@@ -827,16 +917,16 @@ export default function MovementAnalysis() {
         {/* Header & Mode Switcher */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">Step 3 of 4 &bull; Computer Vision Kinematics</span>
-            <h1 className="mt-1 text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+            <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">Step 3 of 4 &bull; Computer Vision Kinematics</span>
+            <h1 className="mt-1 text-2xl md:text-3xl font-black text-white tracking-tight">
               30-Second Chair Stand Test (10 Reps Target)
             </h1>
-            <p className="text-sm text-slate-500">
-              Watch the demonstration first, then click <b>Start Test Now</b> to begin the 3-2-1 countdown.
+            <p className="text-sm text-slate-400">
+              Watch the demonstration first, then click <b className="text-teal-300">Start Test Now</b> to begin the 3-2-1 countdown.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-200/80 p-1 rounded-xl border border-slate-300">
+          <div className="flex items-center gap-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
             <button
               onClick={() => {
                 setActiveMode("DEMO")
@@ -845,7 +935,7 @@ export default function MovementAnalysis() {
                 setTestComplete(false)
               }}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                activeMode === "DEMO" ? "bg-white text-teal-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                activeMode === "DEMO" ? "bg-slate-700 text-teal-300 shadow-sm border border-slate-600" : "text-slate-400 hover:text-white"
               }`}
             >
               <span>📺</span>
@@ -855,7 +945,7 @@ export default function MovementAnalysis() {
             <button
               onClick={() => triggerStartTest(true)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                activeMode === "TEST" ? "bg-teal-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                activeMode === "TEST" ? "bg-teal-600 text-white shadow-sm border border-teal-500" : "text-slate-400 hover:text-white"
               }`}
             >
               <span>📷</span>
@@ -865,20 +955,20 @@ export default function MovementAnalysis() {
         </div>
 
         {/* ── MULTILINGUAL AUDIO VOICE GUIDANCE DECK (MDoNER Item 4) ── */}
-        <div className="rounded-2xl border border-teal-200/90 bg-gradient-to-r from-teal-50/90 via-emerald-50/70 to-cyan-50/90 p-4 sm:p-5 shadow-xs mb-6">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5 shadow-md mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white text-lg shadow-xs">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600/90 text-white text-lg shadow-sm border border-teal-500/40">
                 🗣️
               </span>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <span>Audio Voice Language</span>
-                  <span className="rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide">
+                  <span className="rounded-full bg-teal-950 text-teal-300 border border-teal-800 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide">
                     6 NER & National Languages
                   </span>
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-400">
                   Select your preferred language. All countdowns, 10-rep praises, and instructions will speak in this voice.
                 </p>
               </div>
@@ -888,10 +978,10 @@ export default function MovementAnalysis() {
               <button
                 type="button"
                 onClick={() => handleSelectLang(selectedLang, true)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
                   isPlayingVoicePreview
-                    ? "bg-teal-700 text-white border-teal-800 ring-2 ring-teal-400/40 animate-pulse"
-                    : "bg-white text-teal-800 border-teal-300 hover:bg-teal-50"
+                    ? "bg-teal-600 text-white border-teal-500 ring-2 ring-teal-400/40 animate-pulse"
+                    : "bg-slate-800 text-teal-300 border-slate-700 hover:bg-slate-700"
                 }`}
                 title="Play Audio Sample"
               >
@@ -905,7 +995,7 @@ export default function MovementAnalysis() {
                   playPleasantChime()
                   speakText(VOICE_PROMPTS[selectedLang]?.welcomeTutorial, selectedLang)
                 }}
-                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-sm"
                 title="Listen to Full Tutorial"
               >
                 <span>🌸</span>
@@ -926,24 +1016,24 @@ export default function MovementAnalysis() {
                   onClick={() => handleSelectLang(langKey, true)}
                   className={`relative p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
                     isSelected
-                      ? "bg-white border-teal-600 shadow-md ring-2 ring-teal-500/30"
-                      : "bg-white/70 border-slate-200 hover:bg-white hover:border-slate-300 shadow-2xs"
+                      ? "bg-slate-800 border-teal-500 shadow-md ring-2 ring-teal-500/30"
+                      : "bg-slate-950/60 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <span className="text-xl leading-none">{lang.flag}</span>
                     {isSelected && (
-                      <span className="flex items-center gap-1 text-[10px] font-black text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded-md border border-teal-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-ping" />
+                      <span className="flex items-center gap-1 text-[10px] font-black text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded-md border border-teal-800">
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-ping" />
                         ACTIVE
                       </span>
                     )}
                   </div>
                   <div>
-                    <div className="font-bold text-slate-900 text-xs leading-tight">
+                    <div className="font-bold text-white text-xs leading-tight">
                       {lang.nativeName}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-medium">
+                    <div className="text-[10px] text-slate-400 font-medium">
                       {lang.name}
                     </div>
                   </div>
@@ -953,14 +1043,14 @@ export default function MovementAnalysis() {
           </div>
 
           {/* Currently selected phrase preview text */}
-          <div className="mt-3 pt-2.5 border-t border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-1.5">
+          <div className="mt-3 pt-2.5 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-1.5">
             <div className="flex items-center gap-2 truncate">
-              <span className="font-semibold text-teal-900">Current Voice:</span>
-              <span className="italic text-slate-700 truncate">
+              <span className="font-semibold text-teal-300">Current Voice:</span>
+              <span className="italic text-slate-400 truncate">
                 "{VOICE_PROMPTS[selectedLang]?.previewPhrase}"
               </span>
             </div>
-            <div className="text-[11px] text-teal-700 font-medium whitespace-nowrap">
+            <div className="text-[11px] text-teal-400 font-medium whitespace-nowrap">
               🗣️ Audio Active: {VOICE_PROMPTS[selectedLang]?.name} ({VOICE_PROMPTS[selectedLang]?.nativeName})
             </div>
           </div>
@@ -968,16 +1058,16 @@ export default function MovementAnalysis() {
 
         {/* ── MODE 1: HUMAN DEMONSTRATION VIDEO STAGE ── */}
         {activeMode === "DEMO" && (
-          <div className="rounded-3xl bg-white border border-slate-200 p-6 md:p-8 shadow-sm mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
+          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 md:p-8 shadow-xl mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4">
               <div>
-                <span className="rounded-full bg-teal-100 text-teal-800 text-xs font-bold px-3 py-0.5 uppercase tracking-wider">
+                <span className="rounded-full bg-teal-950 text-teal-300 border border-teal-800 text-xs font-bold px-3 py-0.5 uppercase tracking-wider">
                   {VOICE_PROMPTS[selectedLang]?.flag} {VOICE_PROMPTS[selectedLang]?.name} ({VOICE_PROMPTS[selectedLang]?.nativeName}) Clinical Video
                 </span>
-                <h3 className="mt-1 text-xl font-bold text-slate-900">
+                <h3 className="mt-1 text-xl font-bold text-white">
                   {VOICE_PROMPTS[selectedLang]?.videoTitle || "How a Real Human Performs the Chair Stand Test"}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-400">
                   {VOICE_PROMPTS[selectedLang]?.videoSubtitle || "Observe the clinical demonstration before starting your camera test."}
                 </p>
               </div>
@@ -986,7 +1076,7 @@ export default function MovementAnalysis() {
                 <button
                   type="button"
                   onClick={() => speakVideoNarration(selectedLang)}
-                  className="rounded-xl bg-teal-700 text-white hover:bg-teal-800 px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+                  className="rounded-xl bg-teal-600 text-white hover:bg-teal-500 px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md border border-teal-500/40"
                 >
                   <span>🔊</span>
                   <span>Play {VOICE_PROMPTS[selectedLang]?.nativeName} Spoken Video Audio</span>
@@ -1059,16 +1149,16 @@ export default function MovementAnalysis() {
                 </div>
 
                 {/* Source Selection Bar */}
-                <div className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2">
+                <div className="flex items-center justify-between text-xs bg-slate-900/70 border border-slate-800 rounded-xl px-3.5 py-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-700">Demonstration Video:</span>
+                    <span className="font-bold text-slate-300">Demonstration Video:</span>
                     <button
                       type="button"
                       onClick={() => setDemoVideoSource("video")}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
                         demoVideoSource === "video"
-                          ? "bg-teal-700 text-white shadow-xs"
-                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                          ? "bg-teal-600 text-white shadow-sm border border-teal-500"
+                          : "bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
                       }`}
                     >
                       <span>🎥</span>
@@ -1079,15 +1169,15 @@ export default function MovementAnalysis() {
                       onClick={() => setDemoVideoSource("youtube")}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
                         demoVideoSource === "youtube"
-                          ? "bg-red-600 text-white shadow-xs"
-                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                          ? "bg-red-600 text-white shadow-sm border border-red-500"
+                          : "bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
                       }`}
                     >
                       <span>▶</span>
                       <span>YouTube Guide</span>
                     </button>
                   </div>
-                  <span className="text-[11px] text-teal-700 font-semibold hidden md:inline">
+                  <span className="text-[11px] text-teal-400 font-semibold hidden md:inline">
                     Authentic Clinical Assessment Video
                   </span>
                 </div>
@@ -1095,22 +1185,22 @@ export default function MovementAnalysis() {
 
               {/* Right: Golden Rules & Big "Start Test Now" Button */}
               <div className="space-y-4">
-                <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">3 Golden Rules for Accuracy</h4>
+                <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-3">
+                  <h4 className="text-xs font-bold text-teal-300 uppercase tracking-wide">3 Golden Rules for Accuracy</h4>
                   
-                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
-                    <span className="font-bold text-teal-700 text-sm">1.</span>
-                    <span><b>Sturdy Chair:</b> Place a firm chair against a wall so it won't slide. Keep feet flat on the floor.</span>
+                  <div className="flex items-start gap-2.5 text-xs text-slate-300">
+                    <span className="font-bold text-teal-400 text-sm">1.</span>
+                    <span><b className="text-white">Sturdy Chair:</b> Place a firm chair against a wall so it won't slide. Keep feet flat on the floor.</span>
                   </div>
 
-                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
-                    <span className="font-bold text-teal-700 text-sm">2.</span>
-                    <span><b>Cross Your Arms:</b> Fold arms across your chest. Do not push off from the chair or thighs with your hands!</span>
+                  <div className="flex items-start gap-2.5 text-xs text-slate-300">
+                    <span className="font-bold text-teal-400 text-sm">2.</span>
+                    <span><b className="text-white">Cross Your Arms:</b> Fold arms across your chest. Do not push off from the chair or thighs with your hands!</span>
                   </div>
 
-                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
-                    <span className="font-bold text-teal-700 text-sm">3.</span>
-                    <span><b>Target 10 Reps:</b> Stand all the way up, then sit back down smoothly. Test automatically finishes when you reach 10 reps!</span>
+                  <div className="flex items-start gap-2.5 text-xs text-slate-300">
+                    <span className="font-bold text-teal-400 text-sm">3.</span>
+                    <span><b className="text-white">Target 10 Reps:</b> Stand all the way up, then sit back down smoothly. Test automatically finishes when you reach 10 reps!</span>
                   </div>
                 </div>
 
@@ -1118,7 +1208,7 @@ export default function MovementAnalysis() {
                 <div className="pt-2 space-y-2.5">
                   <button
                     onClick={() => triggerStartTest(true)}
-                    className="w-full rounded-2xl bg-gradient-to-r from-teal-700 to-emerald-700 py-4 px-6 text-sm font-black text-white hover:from-teal-800 hover:to-emerald-800 transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 py-4 px-6 text-sm font-black text-white hover:from-teal-500 hover:to-emerald-500 transition shadow-[0_0_30px_rgba(20,184,166,0.4)] flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>📷</span>
                     <span>Ready? Start Test Now (3-2-1 Countdown)</span>
@@ -1126,7 +1216,7 @@ export default function MovementAnalysis() {
 
                   <button
                     onClick={() => triggerStartTest(false)}
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 px-4 text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900/70 py-2.5 px-4 text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>▶</span>
                     <span>Start in Simulation Mode (Without Webcam)</span>
@@ -1192,7 +1282,7 @@ export default function MovementAnalysis() {
                     {completionReason === "10_REPS" ? "10/10 Reps Finished!" : "Time Complete!"}
                   </h3>
                   <p className="text-xs text-slate-300 max-w-sm mt-2 leading-relaxed">
-                    Knee kinematics, flexion range ({kneeAngle}°), and quadriceps endurance successfully measured.
+                    Knee kinematics, flexion range ({liveFlexionAngle}° peak flexion), and quadriceps endurance successfully measured.
                   </p>
 
                   <div className="mt-6 flex gap-3">
@@ -1272,10 +1362,10 @@ export default function MovementAnalysis() {
                   </span>
                 </div>
 
-                {/* Knee Angle with Neon Cyan Glow */}
+                {/* Knee Flexion Angle (Clinical: 0° = straight, ↑ as knee bends) */}
                 <div className="px-3.5 py-1.5 rounded-2xl bg-slate-950/90 backdrop-blur-md border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center gap-2 text-xs font-bold text-cyan-300">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                  <span>Knee: <strong className="text-white text-sm font-mono">{kneeAngle}°</strong></span>
+                  <span>Flex: <strong className={`text-sm font-mono ${liveFlexionAngle >= 70 ? "text-amber-300" : liveFlexionAngle >= 40 ? "text-yellow-200" : "text-emerald-300"}`}>{liveFlexionAngle}°</strong></span>
                 </div>
               </div>
 
@@ -1302,11 +1392,23 @@ export default function MovementAnalysis() {
               </div>
 
             </div>
-            {/* Right Column: Vibrant & Catchy Live Metrics */}
+
+            {/* ── CAMERA POSITIONING GUIDANCE BANNER (Part B) ──
+                Shown whenever landmark visibility is poor enough to affect tracking quality.
+                Appears before AND during the assessment so the user always knows if the
+                camera can see their knee properly. */}
+            {cameraGuidance !== "" && activeMode === "TEST" && (
+              <div className="mt-2 flex items-center gap-3 rounded-xl bg-amber-950/70 border border-amber-700 px-4 py-2.5 shadow text-amber-200 text-xs font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span>{cameraGuidance}</span>
+              </div>
+            )}
+
+            {/* Right Column: Live Metrics */}
             <div className="space-y-4">
               
               {/* Interactive Telemetry Controls Card */}
-              <div className="rounded-2xl border border-teal-500/50 bg-gradient-to-br from-slate-900 via-teal-950/40 to-slate-900 p-4 shadow-lg shadow-teal-500/10">
+              <div className="rounded-2xl border border-teal-800/70 bg-teal-950/50 p-4 shadow-md">
                 <span className="text-[11px] font-black text-teal-300 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                   <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
                   Live Posture & Rep Controls
@@ -1320,73 +1422,131 @@ export default function MovementAnalysis() {
                       playPleasantChime()
                       speakRepPraise(repCount + 1, selectedLang)
                     }}
-                    className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1"
+                    className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white font-black text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1"
                   >
                     <span>+1 Count Rep</span>
                   </button>
                 </div>
-                <div className="mt-2 text-[10px] text-teal-300/80 text-center font-medium">
-                  💡 Tip: Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-mono font-bold">Spacebar</kbd> anytime to toggle Sit / Stand!
+                <div className="mt-2 text-[10px] text-slate-400 text-center font-medium">
+                  💡 Tip: Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono font-bold">Spacebar</kbd> anytime to toggle Sit / Stand!
                 </div>
               </div>
 
-              {/* Repetition Target Card */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl backdrop-blur-md">
+              {/* ── LIVE KNEE FLEXION & GONIOMETRY TELEMETRY CARD ── */}
+              <div className="rounded-2xl border border-cyan-800/60 bg-slate-900/90 p-4 shadow-md">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Repetition Target</span>
-                  <span className="text-xs font-black text-emerald-400 font-mono px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800">
+                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                    Knee Flexion Goniometry
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-300">
+                    Live CV Optical
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div>
+                    <span className={`text-4xl font-black font-mono ${liveFlexionAngle >= 70 ? "text-amber-400" : liveFlexionAngle >= 40 ? "text-yellow-300" : "text-emerald-400"}`}>
+                      {liveFlexionAngle}°
+                    </span>
+                    <span className="text-xs text-slate-400 ml-2 font-medium">Live Knee Bend</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">Peak Bend</span>
+                    <span className="text-lg font-black font-mono text-emerald-400">
+                      {Math.max(0, Math.round(180 - minFlexion))}°
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dynamic Flexion Arc Progress Bar */}
+                <div className="mt-3">
+                  <div className="flex justify-between text-[10px] font-mono text-slate-500 mb-1">
+                    <span>0° (Straight)</span>
+                    <span>90° (Seated Bend)</span>
+                    <span>130°+ (Deep)</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-400 via-yellow-400 to-amber-500 rounded-full transition-all duration-150"
+                      style={{ width: `${Math.min(100, (liveFlexionAngle / 130) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 font-bold block">Active Arc (ROM)</span>
+                    <span className="text-sm font-black font-mono text-teal-300">{Math.max(0, Math.round(maxExtension - minFlexion))}°</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 font-bold block">Interior Angle</span>
+                    <span className="text-sm font-black font-mono text-slate-200">{kneeAngle}°</span>
+                  </div>
+                </div>
+
+                <p className="mt-2.5 text-[10px] text-slate-500 leading-tight">
+                  📐 Optical CV measures 3-point joint goniometry (hip-knee-ankle). Postural standing/sitting elevation is verified by SandhiBand™ hardware (IMU + FSR).
+                </p>
+              </div>
+
+              {/* Repetition Target Card */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">Repetition Target</span>
+                  <span className="text-xs font-black text-emerald-300 font-mono px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800">
                     {repCount} / 10 Reps
                   </span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 font-mono">
+                  <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 font-mono">
                     {repCount}
                   </span>
                   <span className="text-xs text-slate-400 font-semibold">of 10 completed</span>
                 </div>
                 <div className="mt-3 h-2.5 w-full bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
                   <div
-                    className="h-full bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(45,212,191,0.8)]"
+                    className="h-full bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(100, (repCount / 10) * 100)}%` }}
                   />
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">
+                <p className="mt-2 text-[11px] text-slate-500">
                   Test auto-completes and proceeds to AI analysis when you reach 10 reps.
                 </p>
               </div>
 
               {/* Real-time Posture Card */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl backdrop-blur-md">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Current Posture</span>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-md">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">Current Posture</span>
                 <div className="mt-2.5 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className={`h-4 w-4 rounded-full ${
-                      sitToStandState === "STANDING" ? "bg-emerald-400 animate-pulse shadow-[0_0_12px_rgba(52,211,153,0.8)]" : "bg-amber-400 animate-pulse shadow-[0_0_12px_rgba(251,191,36,0.8)]"
+                      sitToStandState === "STANDING" ? "bg-emerald-400 animate-pulse" : "bg-amber-400 animate-pulse"
                     }`} />
                     <span className="text-xl font-black text-white tracking-wide">{sitToStandState}</span>
                   </div>
-                  <span className="text-xs font-bold text-cyan-400 font-mono bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-800">
+                  <span className="text-xs font-bold text-cyan-300 font-mono bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-800">
                     Elevation: {elevationPercent}%
                   </span>
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Camera Vision & Elevation: &gt;52% (Standing) &bull; &lt;40% (Sitting)
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Camera Vision &amp; Elevation: &gt;52% (Standing) &bull; &lt;40% (Sitting)
                 </p>
               </div>
 
               {/* Multilingual Voice Coach Card */}
-              <div className="rounded-2xl border border-teal-800/80 bg-teal-950/30 p-4 shadow-md backdrop-blur-md">
+              <div className="rounded-2xl border border-teal-800/60 bg-teal-950/40 p-4 shadow-md">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-teal-300 uppercase tracking-wide">Audio Voice Coach</span>
                   <span className="text-xs font-bold text-teal-400 font-mono">{VOICE_PROMPTS[selectedLang]?.flag} {VOICE_PROMPTS[selectedLang]?.name}</span>
                 </div>
-                <p className="mt-1.5 text-xs text-slate-300">
-                  Real-time encouragement & counts spoken in <b>{VOICE_PROMPTS[selectedLang]?.nativeName}</b>.
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Real-time encouragement &amp; counts spoken in <b className="text-teal-300">{VOICE_PROMPTS[selectedLang]?.nativeName}</b>.
                 </p>
                 <button
                   type="button"
                   onClick={() => handleSelectLang(selectedLang, true)}
-                  className="mt-2.5 px-3 py-1.5 rounded-lg bg-teal-900/80 hover:bg-teal-800 border border-teal-700 text-xs font-bold text-teal-200 flex items-center gap-1.5 cursor-pointer transition"
+                  className="mt-2.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-teal-900 border border-slate-700 hover:border-teal-700 text-xs font-bold text-teal-300 flex items-center gap-1.5 cursor-pointer transition"
                 >
                   <span>🔊</span>
                   <span>Test Audio Phrase</span>

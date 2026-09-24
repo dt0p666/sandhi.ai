@@ -247,4 +247,22 @@ export function updateScreeningStatus(id, newStatus, newNotes = null) {
     window.dispatchEvent(new CustomEvent("sandhi_screenings_updated"))
   } catch (err) {}
 }
+
+// Save a doctor-authored care plan to a screening record.
+// carePlanData shape: { exercises, lifestyle, followUpDate, reassessmentSchedule, physioReferral, createdBy, createdAt }
+export function updateCarePlan(id, carePlanData) {
+  if (typeof window === "undefined") return
+  try {
+    const current = getScreenings()
+    const updated = current.map(s => {
+      if (s.id === id) {
+        return { ...s, carePlan: carePlanData }
+      }
+      return s
+    })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    window.dispatchEvent(new CustomEvent("sandhi_screenings_updated"))
+  } catch (err) {}
+}
+
 export const getAllScreenings = getScreenings

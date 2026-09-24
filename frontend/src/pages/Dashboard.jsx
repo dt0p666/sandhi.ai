@@ -26,9 +26,11 @@ import {
   Stethoscope, 
   HeartPulse, 
   Sparkles, 
-  Printer 
+  Printer,
+  Calendar,
+  ClipboardList
 } from "lucide-react"
-import { getScreenings, addScreening, updateScreeningStatus } from "../utils/screeningsStore"
+import { getScreenings, addScreening, updateScreeningStatus, updateCarePlan } from "../utils/screeningsStore"
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -54,6 +56,17 @@ export default function Dashboard() {
   const [simulating, setSimulating] = useState(false)
   const [recentSyncId, setRecentSyncId] = useState(null)
 
+  // Doctor Review & Care Plan Workflow (Part A)
+  const [modalTab, setModalTab] = useState("REVIEW") // "REVIEW" | "CARE_PLAN"
+  const [carePlanExercises, setCarePlanExercises] = useState([])
+  const [carePlanCustomExercise, setCarePlanCustomExercise] = useState("")
+  const [carePlanLifestyle, setCarePlanLifestyle] = useState("")
+  const [carePlanFollowUpDate, setCarePlanFollowUpDate] = useState("")
+  const [carePlanTargetPain, setCarePlanTargetPain] = useState("Mild (VAS 1-3)")
+  const [carePlanTargetMobility, setCarePlanTargetMobility] = useState("Target 10+ STS Reps")
+  const [carePlanPhysioReferral, setCarePlanPhysioReferral] = useState(false)
+  const [carePlanReassessment, setCarePlanReassessment] = useState("90_DAYS")
+
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState("")
   const [filterRisk, setFilterRisk] = useState("ALL")
@@ -67,12 +80,26 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    // ── ROLE GUARD: Doctor Hub is strictly doctor-only ──
+    // If no sandhi_user with role="doctor" is found, reject access immediately.
     try {
       const stored = localStorage.getItem("sandhi_user")
-      if (stored) {
-        setUser(JSON.parse(stored))
+      if (!stored) {
+        // No doctor session — could be a patient or not logged in
+        navigate("/", { replace: true })
+        return
       }
-    } catch {}
+      const parsed = JSON.parse(stored)
+      if (parsed.role !== "doctor") {
+        // sandhi_user exists but is not a doctor (e.g., wrong role)
+        navigate("/", { replace: true })
+        return
+      }
+      setUser(parsed)
+    } catch {
+      navigate("/", { replace: true })
+      return
+    }
 
     refreshData()
 
@@ -192,11 +219,24 @@ export default function Dashboard() {
     })
   }, [screenings, searchQuery, filterRisk, filterState, filterStatus])
 
-  // Open modal and prepopulate notes
+  // Open modal and prepopulate notes & care plan
   const handleOpenInspection = (screening) => {
     setSelectedScreening(screening)
     setDoctorNotes(screening.notes || "")
     setSaveStatusMsg("")
+    setModalTab("REVIEW")
+    const existing = screening.carePlan || {}
+    setCarePlanExercises(existing.exercises || [
+      "Isometric Quadriceps Sets (10s hold, 3x daily)",
+      "Seated Knee Extension (Non-weight bearing)"
+    ])
+    setCarePlanCustomExercise(existing.customExercise || "")
+    setCarePlanLifestyle(existing.lifestyle || "Avoid deep squatting and sustained kneeling; prefer firm, chair-height seating.")
+    setCarePlanFollowUpDate(existing.followUpDate || "")
+    setCarePlanTargetPain(existing.targetPain || "Mild (VAS 1-3)")
+    setCarePlanTargetMobility(existing.targetMobility || "Target 10+ STS Reps")
+    setCarePlanPhysioReferral(existing.physioReferral !== undefined ? !!existing.physioReferral : screening.scores?.riskCategory === "HIGH")
+    setCarePlanReassessment(existing.reassessmentSchedule || (screening.scores?.riskCategory === "HIGH" ? "30_DAYS" : "90_DAYS"))
   }
 
   // Update Status in Store
@@ -217,6 +257,39 @@ export default function Dashboard() {
     setSaveStatusMsg("Clinical notes saved successfully!")
     refreshData()
     setTimeout(() => setSaveStatusMsg(""), 3000)
+  }
+
+  // Toggle Exercise Checkbox in Care Plan
+  const handleToggleExercise = (exerciseName) => {
+    setCarePlanExercises(prev => 
+      prev.includes(exerciseName) ? prev.filter(e => e !== exerciseName) : [...prev, exerciseName]
+    )
+  }
+
+  // Save Doctor-Authored Care Plan (Part A)
+  const handleSaveCarePlan = () => {
+    if (!selectedScreening) return
+    const plan = {
+      exercises: carePlanExercises,
+      customExercise: carePlanCustomExercise,
+      lifestyle: carePlanLifestyle,
+      followUpDate: carePlanFollowUpDate,
+      targetPain: carePlanTargetPain,
+      targetMobility: carePlanTargetMobility,
+      physioReferral: carePlanPhysioReferral,
+      reassessmentSchedule: carePlanReassessment,
+      authoredBy: user.full_name || "Dr. Invictus Barman",
+      authoredAt: new Date().toISOString()
+    }
+    updateCarePlan(selectedScreening.id, plan)
+    const newStatus = carePlanFollowUpDate 
+      ? `Care Plan Active (Follow-up: ${carePlanFollowUpDate})`
+      : "Care Plan Active"
+    updateScreeningStatus(selectedScreening.id, newStatus, doctorNotes)
+    setSelectedScreening(prev => ({ ...prev, carePlan: plan, status: newStatus }))
+    setSaveStatusMsg("Care Plan saved & activated! Status updated.")
+    refreshData()
+    setTimeout(() => setSaveStatusMsg(""), 3500)
   }
 
   // Simulate Live Citizen Test (Bonus Feature)
@@ -879,140 +952,416 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Diagnostic Alert Box */}
-            <div className={`mt-6 p-4 rounded-2xl border flex items-start gap-3 ${
-              selectedScreening.scores?.riskCategory === "HIGH" ? "bg-red-950/50 border-red-800/80 text-red-200" :
-              selectedScreening.scores?.riskCategory === "MODERATE" ? "bg-amber-950/50 border-amber-800/80 text-amber-200" :
-              "bg-emerald-950/50 border-emerald-800/80 text-emerald-200"
-            }`}>
-              <AlertTriangle size={20} className="shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-sm">
-                  Clinical Diagnosis: {selectedScreening.scores?.riskCategory} OA Risk &bull; Kellgren-Lawrence Stage {selectedScreening.scores?.klProxy}
-                </p>
-                <p className="text-xs mt-1 leading-relaxed opacity-90">
-                  {selectedScreening.clinicalAction || "Supervised physical therapy and orthopedic monitoring."}
-                </p>
-              </div>
+            {/* Modal Navigation Tabs (Part A) */}
+            <div className="flex border-b border-slate-800 mt-4">
+              <button
+                type="button"
+                onClick={() => setModalTab("REVIEW")}
+                className={`px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 border-b-2 cursor-pointer ${
+                  modalTab === "REVIEW"
+                    ? "border-teal-400 text-teal-300 bg-slate-800/40"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Activity size={14} />
+                <span>1. Patient Data & Diagnostic Review</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab("CARE_PLAN")}
+                className={`px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 border-b-2 cursor-pointer ${
+                  modalTab === "CARE_PLAN"
+                    ? "border-teal-400 text-teal-300 bg-slate-800/40"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <ClipboardList size={14} />
+                <span>2. Doctor-Authored Care Plan</span>
+                {selectedScreening.carePlan && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-900 border border-emerald-600 text-emerald-300 text-[9px] font-bold">
+                    ACTIVE
+                  </span>
+                )}
+              </button>
             </div>
 
-            {/* Biomarker Breakdown Grid */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
-              {/* Kinematics Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                <span className="text-[11px] font-bold text-teal-400 uppercase tracking-wider">Kinematic Mobility</span>
-                <div className="mt-3 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Chair Stand Reps:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.sitToStandReps ?? 8} reps / 30s</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Knee ROM:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.rom ?? 86}&deg;</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Flexion Angle:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.flexionAngle ?? 94}&deg;</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Alignment:</span>
-                    <span className="font-bold text-teal-300">{selectedScreening.scores?.varusValgus || "Normal"} ({selectedScreening.scores?.alignmentRatio ?? 1.15})</span>
+            {/* TAB 1: DIAGNOSTIC DATA & TRIAGE REVIEW */}
+            {modalTab === "REVIEW" && (
+              <>
+                {/* Diagnostic Alert Box */}
+                <div className={`mt-6 p-4 rounded-2xl border flex items-start gap-3 ${
+                  selectedScreening.scores?.riskCategory === "HIGH" ? "bg-red-950/50 border-red-800/80 text-red-200" :
+                  selectedScreening.scores?.riskCategory === "MODERATE" ? "bg-amber-950/50 border-amber-800/80 text-amber-200" :
+                  "bg-emerald-950/50 border-emerald-800/80 text-emerald-200"
+                }`}>
+                  <AlertTriangle size={20} className="shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      Clinical Diagnosis: {selectedScreening.scores?.riskCategory} OA Risk &bull; Kellgren-Lawrence Stage {selectedScreening.scores?.klProxy}
+                    </p>
+                    <p className="text-xs mt-1 leading-relaxed opacity-90">
+                      {selectedScreening.clinicalAction || "Supervised physical therapy and orthopedic monitoring."}
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Acoustic Crepitus Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Acoustic Crepitus (VAG)</span>
-                <div className="mt-3 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Burst Count:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.burstCount ?? 4} bursts</span>
+                {/* Biomarker Breakdown Grid */}
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Kinematics Card */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[11px] font-bold text-teal-400 uppercase tracking-wider">Kinematic Mobility</span>
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Chair Stand Reps:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.sitToStandReps ?? 8} reps / 30s</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Knee ROM:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.rom ?? 86}&deg;</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Flexion Angle:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.flexionAngle ?? 94}&deg;</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Alignment:</span>
+                        <span className="font-bold text-teal-300">{selectedScreening.scores?.varusValgus || "Normal"} ({selectedScreening.scores?.alignmentRatio ?? 1.15})</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Peak Frequency:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.peakFrequency ?? 142} Hz</span>
+
+                  {/* Acoustic Crepitus Card */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Acoustic Crepitus (VAG)</span>
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Burst Count:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.burstCount ?? 4} bursts</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Peak Frequency:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.peakFrequency ?? 142} Hz</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Cartilage Friction:</span>
+                        <span className="font-bold text-cyan-300">
+                          {selectedScreening.scores?.burstCount >= 6 ? "Severe Wear" : "Mild to Moderate"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Cartilage Friction:</span>
-                    <span className="font-bold text-cyan-300">
-                      {selectedScreening.scores?.burstCount >= 6 ? "Severe Wear" : "Mild to Moderate"}
-                    </span>
+
+                  {/* Subjective WOMAC Card */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Symptom Severity</span>
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">WOMAC Score:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.womacScore ?? 45} / 100</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Composite Score:</span>
+                        <span className="font-bold text-white">{selectedScreening.scores?.compositeScore ?? 54} / 100</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Examined Joint:</span>
+                        <span className="font-bold text-white">{selectedScreening.patient?.joint || "Right Knee"}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Subjective WOMAC Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Symptom Severity</span>
-                <div className="mt-3 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">WOMAC Score:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.womacScore ?? 45} / 100</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Composite Score:</span>
-                    <span className="font-bold text-white">{selectedScreening.scores?.compositeScore ?? 54} / 100</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Examined Joint:</span>
-                    <span className="font-bold text-white">{selectedScreening.patient?.joint || "Right Knee"}</span>
+                {/* Doctor Triage Controls */}
+                <div className="mt-6 pt-6 border-t border-slate-800">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+                    Update Clinical Triage Status
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus("Urgent GMCH / RIMS Referral")}
+                      className="px-3 py-2 rounded-xl bg-red-950 text-red-300 hover:bg-red-900 border border-red-700 text-xs font-bold transition cursor-pointer"
+                    >
+                      🏥 Tertiary GMCH/RIMS Referral
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus("PHC Physiotherapy Scheduled")}
+                      className="px-3 py-2 rounded-xl bg-amber-950 text-amber-300 hover:bg-amber-900 border border-amber-700 text-xs font-bold transition cursor-pointer"
+                    >
+                      📅 Schedule PHC Follow-Up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus("Reviewed & Cleared")}
+                      className="px-3 py-2 rounded-xl bg-emerald-950 text-emerald-300 hover:bg-emerald-900 border border-emerald-700 text-xs font-bold transition cursor-pointer"
+                    >
+                      ✅ Mark as Reviewed
+                    </button>
                   </div>
                 </div>
-              </div>
 
-            </div>
+                {/* Doctor's Notes */}
+                <div className="mt-6">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    Attending Clinician &bull; Evaluation Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={doctorNotes}
+                    onChange={(e) => setDoctorNotes(e.target.value)}
+                    placeholder="Enter clinical observations, prescription advice, or referral notes..."
+                    className="w-full rounded-2xl bg-slate-950 border border-slate-800 p-3.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 transition"
+                  />
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-emerald-400 font-semibold">{saveStatusMsg}</span>
+                    <button
+                      type="button"
+                      onClick={handleSaveNotes}
+                      className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition cursor-pointer shadow-md"
+                    >
+                      Save Assessment Notes
+                    </button>
+                  </div>
+                </div>
 
-            {/* Doctor Triage Controls */}
-            <div className="mt-6 pt-6 border-t border-slate-800">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
-                Update Clinical Triage Status
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleUpdateStatus("Urgent GMCH / RIMS Referral")}
-                  className="px-3 py-2 rounded-xl bg-red-950 text-red-300 hover:bg-red-900 border border-red-700 text-xs font-bold transition cursor-pointer"
-                >
-                  🏥 Tertiary GMCH/RIMS Referral
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus("PHC Physiotherapy Scheduled")}
-                  className="px-3 py-2 rounded-xl bg-amber-950 text-amber-300 hover:bg-amber-900 border border-amber-700 text-xs font-bold transition cursor-pointer"
-                >
-                  📅 Schedule PHC Follow-Up
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus("Reviewed & Cleared")}
-                  className="px-3 py-2 rounded-xl bg-emerald-950 text-emerald-300 hover:bg-emerald-900 border border-emerald-700 text-xs font-bold transition cursor-pointer"
-                >
-                  ✅ Mark as Reviewed
-                </button>
-              </div>
-            </div>
+                {/* CTA to Care Plan Tab */}
+                <div className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-teal-950/60 to-slate-950 border border-teal-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                      <ClipboardList size={14} />
+                      <span>Ready to author clinician-approved care plan?</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Structure prescribed physiotherapy, lifestyle modifications, and set scheduled re-assessment date.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalTab("CARE_PLAN")}
+                    className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition cursor-pointer shrink-0 shadow-md"
+                  >
+                    Open Care Plan Form →
+                  </button>
+                </div>
+              </>
+            )}
 
-            {/* Doctor's Notes */}
-            <div className="mt-6">
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Attending Clinician &bull; Evaluation Notes
-              </label>
-              <textarea
-                rows={3}
-                value={doctorNotes}
-                onChange={(e) => setDoctorNotes(e.target.value)}
-                placeholder="Enter clinical observations, prescription advice, or referral notes..."
-                className="w-full rounded-2xl bg-slate-950 border border-slate-800 p-3.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 transition"
-              />
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-emerald-400 font-semibold">{saveStatusMsg}</span>
-                <button
-                  onClick={handleSaveNotes}
-                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition cursor-pointer shadow-md"
-                >
-                  Save Assessment Notes
-                </button>
+            {/* TAB 2: DOCTOR-AUTHORED CARE PLAN & FOLLOW-UP (Part A) */}
+            {modalTab === "CARE_PLAN" && (
+              <div className="mt-6 space-y-6">
+                {/* Clinical Autonomy Notice */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-teal-500/40 text-xs">
+                  <div className="flex items-center gap-2 text-teal-300 font-bold mb-1">
+                    <ShieldCheck size={16} />
+                    <span>Clinician-Authored Care Plan (MDoNER Health Protocol)</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Treatment recommendations and follow-up schedules must be determined and approved by the attending healthcare professional. The AI does not auto-generate or prescribe medical interventions.
+                  </p>
+                </div>
+
+                {/* Clinician-Approved Exercises / Physiotherapy */}
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 sm:p-5">
+                  <label className="block text-xs font-bold text-teal-300 uppercase tracking-wider mb-2">
+                    1. Clinician-Approved Exercises &amp; Physiotherapy
+                  </label>
+                  <p className="text-[11px] text-slate-400 mb-3">
+                    Select approved joint-preserving exercises suited to patient's functional ROM and quadriceps capacity:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      "Isometric Quadriceps Sets (10s hold, 3x daily)",
+                      "Seated Knee Extension (Non-weight bearing)",
+                      "Straight Leg Raises (Supine, 3x10 reps)",
+                      "Hamstring Stretch (Chair/wall assisted, 30s holds)",
+                      "Heel Slides (Gentle active-assisted supine)",
+                      "Low-Impact Aerobic Walking / Stationary Cycling"
+                    ].map((ex) => {
+                      const isChecked = carePlanExercises.includes(ex)
+                      return (
+                        <button
+                          key={ex}
+                          type="button"
+                          onClick={() => handleToggleExercise(ex)}
+                          className={`text-left p-3 rounded-xl border text-xs transition flex items-start gap-2.5 cursor-pointer ${
+                            isChecked
+                              ? "bg-teal-950/60 border-teal-500 text-teal-200"
+                              : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                            isChecked ? "bg-teal-500 text-slate-950" : "border border-slate-600"
+                          }`}>
+                            {isChecked ? "✓" : ""}
+                          </span>
+                          <span className="leading-tight">{ex}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Custom exercise input */}
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={carePlanCustomExercise}
+                      onChange={(e) => setCarePlanCustomExercise(e.target.value)}
+                      placeholder="Add custom clinician instructions or additional exercise..."
+                      className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Activity & Lifestyle Guidance */}
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 sm:p-5">
+                  <label className="block text-xs font-bold text-teal-300 uppercase tracking-wider mb-2">
+                    2. Activity &amp; Lifestyle Guidance
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={carePlanLifestyle}
+                    onChange={(e) => setCarePlanLifestyle(e.target.value)}
+                    placeholder="Enter activity modifications (e.g. avoid deep squatting, use chair seating, terrain unloading)..."
+                    className="w-full rounded-xl bg-slate-900 border border-slate-800 p-3 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 transition"
+                  />
+                </div>
+
+                {/* Follow-up Date & Reassessment Schedule */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4">
+                    <label className="block text-xs font-bold text-teal-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Calendar size={13} />
+                      <span>3. Scheduled Follow-Up Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={carePlanFollowUpDate}
+                      onChange={(e) => setCarePlanFollowUpDate(e.target.value)}
+                      className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-teal-500 transition cursor-pointer"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1.5">
+                      Reaching this date directs patient to complete a new re-assessment session.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4">
+                    <label className="block text-xs font-bold text-teal-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Clock size={13} />
+                      <span>4. Reassessment Interval</span>
+                    </label>
+                    <select
+                      value={carePlanReassessment}
+                      onChange={(e) => setCarePlanReassessment(e.target.value)}
+                      className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-200 outline-none focus:border-teal-500 transition cursor-pointer"
+                    >
+                      <option value="30_DAYS">30 Days (High Risk / Post-Injection Review)</option>
+                      <option value="60_DAYS">60 Days (Mid-Term Physiotherapy Check)</option>
+                      <option value="90_DAYS">90 Days (Standard Quarterly Surveillance)</option>
+                      <option value="6_MONTHS">6 Months (Moderate Joint Stability)</option>
+                      <option value="1_YEAR">1 Year (Annual Routine Prevention)</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1.5">
+                      Standard protocol recommended by State Nodal Orthopedic Directorate.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pain / Mobility Tracking Fields & Physiotherapy Referral Flag */}
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 sm:p-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        5. Target Pain Level
+                      </label>
+                      <input
+                        type="text"
+                        value={carePlanTargetPain}
+                        onChange={(e) => setCarePlanTargetPain(e.target.value)}
+                        placeholder="e.g. Mild (VAS 1-3) or 30% reduction"
+                        className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-teal-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        6. Target Mobility Metric
+                      </label>
+                      <input
+                        type="text"
+                        value={carePlanTargetMobility}
+                        onChange={(e) => setCarePlanTargetMobility(e.target.value)}
+                        placeholder="e.g. Target 10+ STS reps / ROM ≥95°"
+                        className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-teal-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Physiotherapy Referral Flag */}
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                    <input
+                      type="checkbox"
+                      checked={carePlanPhysioReferral}
+                      onChange={(e) => setCarePlanPhysioReferral(e.target.checked)}
+                      className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950 cursor-pointer"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-slate-200">
+                        Physiotherapy Referral Flag
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Dispatch formal clinical order to nearest PHC / CHC Physical Therapy Unit.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Save and Activate Button */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Stethoscope size={14} className="text-teal-400" />
+                    <span>Authoring Clinician: <b className="text-slate-200">{user.full_name || "Dr. Invictus Barman"}</b></span>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {saveStatusMsg && (
+                      <span className="text-xs text-emerald-400 font-semibold">{saveStatusMsg}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSaveCarePlan}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 size={15} />
+                      <span>Save &amp; Activate Care Plan</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Care Plan Summary Card if already authored */}
+                {selectedScreening.carePlan && (
+                  <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-600/40 text-xs text-emerald-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        <span>Active Care Plan on Record</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono">
+                        Authored: {new Date(selectedScreening.carePlan.authoredAt || Date.now()).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-300/90">
+                      <b>Exercises:</b> {selectedScreening.carePlan.exercises?.join(", ") || "Standard regimen"}
+                      {selectedScreening.carePlan.customExercise ? ` (${selectedScreening.carePlan.customExercise})` : ""}
+                    </p>
+                    <p className="text-[11px] text-emerald-300/90">
+                      <b>Guidance:</b> {selectedScreening.carePlan.lifestyle || "None specified"}
+                    </p>
+                    <p className="text-[11px] text-emerald-300/90">
+                      <b>Next Follow-Up:</b> {selectedScreening.carePlan.followUpDate || "Scheduled per protocol"} &bull; <b>Reassessment:</b> {selectedScreening.carePlan.reassessmentSchedule}
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Bottom Actions */}
             <div className="mt-8 pt-5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">

@@ -18,7 +18,7 @@ import {
   ShieldCheck
 } from "lucide-react"
 
-// Exact WOMAC Subscales as specified in Sandy AI spec
+// Exact WOMAC Subscales as specified in Sandhi AI spec
 const PAIN_QUESTIONS = [
   { id: "p1", title: "Walking on flat ground", desc: "Pain experienced while walking on level terrain or corridors" },
   { id: "p2", title: "Going up or down stairs", desc: "Pain while ascending or descending stairs/slopes" },
@@ -97,7 +97,7 @@ export default function Assessment() {
     }
   }, [])
 
-  // Patient Demographics & Additional Risk Factors (Sandy AI Spec Section 2)
+  // Patient Demographics & Additional Risk Factors (Sandhi AI Spec Section 2)
   const [patientData, setPatientData] = useState(() => {
     try {
       const stored = localStorage.getItem("sandhi_patient")
@@ -199,7 +199,7 @@ export default function Assessment() {
       <ScreeningStepper currentStep={1} />
       
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between shadow-lg">
+      <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate("/registration")}
@@ -209,10 +209,10 @@ export default function Assessment() {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
                 Module 1 of 4
               </span>
-              <h1 className="text-lg font-black text-slate-100">
+              <h1 className="text-lg font-black text-white">
                 WOMAC Clinical Questionnaire
               </h1>
             </div>
@@ -232,7 +232,7 @@ export default function Assessment() {
           </div>
           <button
             onClick={handleContinueToMovement}
-            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition shadow-lg shadow-teal-900/40 flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <span>Continue to CV Video</span>
             <ArrowRight size={14} />
@@ -244,11 +244,11 @@ export default function Assessment() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
         
         {/* Subscale Progress Navigation Tabs */}
-        <div className="grid grid-cols-4 gap-2 mb-6 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+        <div className="grid grid-cols-4 gap-2 mb-6 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
           <button
             onClick={() => setActiveTab("pain")}
             className={`py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "pain" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              activeTab === "pain" ? "bg-teal-600 text-white shadow-sm border border-teal-500" : "text-slate-400 hover:text-white"
             }`}
           >
             <span>1. Pain Subscale</span>
@@ -258,7 +258,7 @@ export default function Assessment() {
           <button
             onClick={() => setActiveTab("stiffness")}
             className={`py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "stiffness" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              activeTab === "stiffness" ? "bg-amber-600 text-white shadow-sm border border-amber-500" : "text-slate-400 hover:text-white"
             }`}
           >
             <span>2. Stiffness</span>
@@ -268,7 +268,7 @@ export default function Assessment() {
           <button
             onClick={() => setActiveTab("function")}
             className={`py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "function" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              activeTab === "function" ? "bg-cyan-600 text-white shadow-sm border border-cyan-500" : "text-slate-400 hover:text-white"
             }`}
           >
             <span>3. Physical Function</span>
@@ -278,7 +278,7 @@ export default function Assessment() {
           <button
             onClick={() => setActiveTab("risk")}
             className={`py-2.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "risk" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              activeTab === "risk" ? "bg-teal-600 text-white shadow-sm border border-teal-500" : "text-slate-400 hover:text-white"
             }`}
           >
             <span>4. Risk Factors &amp; BMI</span>
@@ -289,7 +289,7 @@ export default function Assessment() {
         {/* ── TAB 1: PAIN SUBSCALE (5 QUESTIONS, EACH 0-4) ── */}
         {activeTab === "pain" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-teal-950/40 border border-teal-800/60 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-teal-950/60 border border-teal-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-teal-300">WOMAC Pain Subscale (5 Items)</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Rate the intensity of knee pain experienced over the last 48 hours.</p>
@@ -298,13 +298,13 @@ export default function Assessment() {
             </div>
 
             {PAIN_QUESTIONS.map((q, idx) => (
-              <div key={q.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div key={q.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
                 <div className="mb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-slate-800 text-teal-400 flex items-center justify-center font-bold text-xs border border-slate-700">
                       {idx + 1}
                     </span>
-                    <h3 className="text-sm font-bold text-slate-100">{q.title}</h3>
+                    <h3 className="text-sm font-bold text-white">{q.title}</h3>
                   </div>
                   <p className="text-xs text-slate-400 mt-1 ml-7">{q.desc}</p>
                 </div>
@@ -317,8 +317,8 @@ export default function Assessment() {
                       onClick={() => handleSelectSeverity(q.id, lvl.value, "pain")}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         painAnswers[q.id] === lvl.value
-                          ? "bg-teal-600 text-white border-teal-400 shadow-md ring-1 ring-teal-400"
-                          : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300"
+                          ? "bg-teal-600 text-white border-teal-500 shadow-sm ring-1 ring-teal-500"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
                       }`}
                     >
                       <p className="text-xs font-bold">{lvl.label}</p>
@@ -332,7 +332,7 @@ export default function Assessment() {
             <div className="flex justify-end pt-4">
               <button
                 onClick={() => setActiveTab("stiffness")}
-                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>Proceed to Stiffness Subscale →</span>
               </button>
@@ -343,7 +343,7 @@ export default function Assessment() {
         {/* ── TAB 2: STIFFNESS SUBSCALE (2 QUESTIONS, EACH 0-4) ── */}
         {activeTab === "stiffness" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-800/60 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-amber-950/60 border border-amber-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-amber-300">WOMAC Stiffness Subscale (2 Items)</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Stiffness is a sensation of restriction or sluggishness in the ease with which you move your knee.</p>
@@ -352,13 +352,13 @@ export default function Assessment() {
             </div>
 
             {STIFFNESS_QUESTIONS.map((q, idx) => (
-              <div key={q.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div key={q.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
                 <div className="mb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs border border-slate-700">
                       {idx + 1}
                     </span>
-                    <h3 className="text-sm font-bold text-slate-100">{q.title}</h3>
+                    <h3 className="text-sm font-bold text-white">{q.title}</h3>
                   </div>
                   <p className="text-xs text-slate-400 mt-1 ml-7">{q.desc}</p>
                 </div>
@@ -371,8 +371,8 @@ export default function Assessment() {
                       onClick={() => handleSelectSeverity(q.id, lvl.value, "stiffness")}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         stiffnessAnswers[q.id] === lvl.value
-                          ? "bg-amber-600 text-white border-amber-400 shadow-md ring-1 ring-amber-400"
-                          : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300"
+                          ? "bg-amber-600 text-white border-amber-500 shadow-sm ring-1 ring-amber-500"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
                       }`}
                     >
                       <p className="text-xs font-bold">{lvl.label}</p>
@@ -386,13 +386,13 @@ export default function Assessment() {
             <div className="flex justify-between pt-4">
               <button
                 onClick={() => setActiveTab("pain")}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer border border-slate-700"
               >
                 ← Back to Pain
               </button>
               <button
                 onClick={() => setActiveTab("function")}
-                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>Proceed to Physical Function →</span>
               </button>
@@ -403,7 +403,7 @@ export default function Assessment() {
         {/* ── TAB 3: PHYSICAL FUNCTION SUBSCALE (17 QUESTIONS, EACH 0-4) ── */}
         {activeTab === "function" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-800/60 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-cyan-950/60 border border-cyan-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-cyan-300">WOMAC Physical Function Subscale (17 Items)</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Rate the degree of difficulty experienced while performing daily activities.</p>
@@ -412,14 +412,14 @@ export default function Assessment() {
             </div>
 
             {FUNCTION_QUESTIONS.map((q, idx) => (
-              <div key={q.id} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div key={q.id} className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-slate-800 text-cyan-400 flex items-center justify-center font-bold text-xs border border-slate-700 shrink-0">
                       {idx + 1}
                     </span>
                     <div>
-                      <h3 className="text-xs sm:text-sm font-bold text-slate-100">{q.title}</h3>
+                      <h3 className="text-xs sm:text-sm font-bold text-white">{q.title}</h3>
                       <p className="text-[11px] text-slate-400">{q.desc}</p>
                     </div>
                   </div>
@@ -433,8 +433,8 @@ export default function Assessment() {
                       onClick={() => handleSelectSeverity(q.id, lvl.value, "function")}
                       className={`py-2 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                         functionAnswers[q.id] === lvl.value
-                          ? "bg-cyan-600 text-white border-cyan-400 shadow-xs font-bold"
-                          : "bg-slate-950 border-slate-800/80 hover:border-slate-700 text-slate-400 text-xs"
+                          ? "bg-cyan-600 text-white border-cyan-500 shadow-sm font-bold"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300 text-xs"
                       }`}
                     >
                       <span className="text-xs font-bold block">{lvl.value}</span>
@@ -448,13 +448,13 @@ export default function Assessment() {
             <div className="flex justify-between pt-4">
               <button
                 onClick={() => setActiveTab("stiffness")}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer border border-slate-700"
               >
                 ← Back to Stiffness
               </button>
               <button
                 onClick={() => setActiveTab("risk")}
-                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>Proceed to Risk Factors &amp; BMI →</span>
               </button>
@@ -465,21 +465,21 @@ export default function Assessment() {
         {/* ── TAB 4: RISK FACTORS, DEMOGRAPHICS & BMI ── */}
         {activeTab === "risk" && (
           <div className="space-y-5">
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between shadow-md">
               <div>
-                <h2 className="text-sm font-bold text-slate-200">Patient Demographics &amp; Biomechanical Risk Covariates</h2>
+                <h2 className="text-sm font-bold text-white">Patient Demographics &amp; Biomechanical Risk Covariates</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Used for age/sex normalization and composite risk evaluation.</p>
               </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded bg-teal-950 text-teal-400 border border-teal-800">
+              <span className="text-xs font-bold px-2.5 py-1 rounded bg-teal-950 text-teal-300 border border-teal-800">
                 BMI: {bmi} kg/m² ({bmi >= 25 ? "Elevated" : "Normal"})
               </span>
             </div>
 
-            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-md">
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     Height (cm)
                   </label>
                   <input
@@ -488,12 +488,12 @@ export default function Assessment() {
                     onChange={(e) => setHeightCm(Number(e.target.value) || 150)}
                     min={100}
                     max={220}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-white outline-none focus:border-teal-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     Weight (kg)
                   </label>
                   <input
@@ -502,13 +502,13 @@ export default function Assessment() {
                     onChange={(e) => setWeightKg(Number(e.target.value) || 50)}
                     min={30}
                     max={180}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm text-white outline-none focus:border-teal-400"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                   Primary Occupation Type
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -516,7 +516,7 @@ export default function Assessment() {
                     type="button"
                     onClick={() => setOccupationType("manual")}
                     className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                      occupationType === "manual" ? "bg-teal-950 border-teal-500 text-teal-200 shadow-sm" : "bg-slate-950 border-slate-800 text-slate-400"
+                      occupationType === "manual" ? "bg-teal-950/80 border-teal-500 text-teal-300 shadow-md ring-1 ring-teal-500/30" : "bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-900"
                     }`}
                   >
                     <p className="text-xs font-bold">🌾 Heavy Manual / Field Labor</p>
@@ -527,7 +527,7 @@ export default function Assessment() {
                     type="button"
                     onClick={() => setOccupationType("sedentary")}
                     className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                      occupationType === "sedentary" ? "bg-teal-950 border-teal-500 text-teal-200 shadow-sm" : "bg-slate-950 border-slate-800 text-slate-400"
+                      occupationType === "sedentary" ? "bg-teal-950/80 border-teal-500 text-teal-300 shadow-md ring-1 ring-teal-500/30" : "bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-900"
                     }`}
                   >
                     <p className="text-xs font-bold">🏢 Sedentary / Office Work</p>
@@ -537,28 +537,28 @@ export default function Assessment() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={familyHistory}
                     onChange={(e) => setFamilyHistory(e.target.checked)}
-                    className="w-4 h-4 text-teal-600 rounded border-slate-700 focus:ring-teal-500"
+                    className="w-4 h-4 text-teal-500 rounded border-slate-700 bg-slate-900 focus:ring-teal-400"
                   />
                   <div>
-                    <span className="text-xs font-bold text-slate-200">Family History of Arthritis</span>
+                    <span className="text-xs font-bold text-white">Family History of Arthritis</span>
                     <p className="text-[11px] text-slate-400">Parents or siblings with severe knee pain / surgery</p>
                   </div>
                 </label>
 
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={priorInjury}
                     onChange={(e) => setPriorInjury(e.target.checked)}
-                    className="w-4 h-4 text-teal-600 rounded border-slate-700 focus:ring-teal-500"
+                    className="w-4 h-4 text-teal-500 rounded border-slate-700 bg-slate-900 focus:ring-teal-400"
                   />
                   <div>
-                    <span className="text-xs font-bold text-slate-200">Prior Knee Joint Injury</span>
+                    <span className="text-xs font-bold text-white">Prior Knee Joint Injury</span>
                     <p className="text-[11px] text-slate-400">Meniscus tear, ligament sprain, or fracture</p>
                   </div>
                 </label>
@@ -567,7 +567,7 @@ export default function Assessment() {
             </div>
 
             {/* Final Scoring Summary Banner */}
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-teal-950/80 via-slate-900 to-slate-950 border border-teal-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="p-5 rounded-2xl bg-slate-900/90 border border-teal-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
               <div>
                 <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
                   Module 1 Score Output
@@ -575,14 +575,14 @@ export default function Assessment() {
                 <p className="text-2xl font-black text-white mt-0.5">
                   WOMAC Score: {scoring.normalizedScore} <span className="text-xs font-normal text-slate-400">/ 100</span>
                 </p>
-                <p className="text-xs text-slate-300 mt-1">
-                  Pain: <b>{scoring.painScore}/20</b> &bull; Stiffness: <b>{scoring.stiffnessScore}/8</b> &bull; Function: <b>{scoring.functionScore}/68</b>
+                <p className="text-xs text-slate-400 mt-1">
+                  Pain: <b className="text-teal-300">{scoring.painScore}/20</b> &bull; Stiffness: <b className="text-amber-300">{scoring.stiffnessScore}/8</b> &bull; Function: <b className="text-cyan-300">{scoring.functionScore}/68</b>
                 </p>
               </div>
 
               <button
                 onClick={handleContinueToMovement}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-sm transition shadow-lg shadow-teal-900/40 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-sm transition shadow-[0_0_25px_rgba(20,184,166,0.4)] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Proceed to 30s Video Test</span>
                 <ArrowRight size={16} />

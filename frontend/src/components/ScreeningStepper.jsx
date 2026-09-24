@@ -43,20 +43,20 @@ export default function ScreeningStepper({ currentStep = 1 }) {
   ]
 
   return (
-    <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40 px-4 py-3 shadow-lg">
+    <div className="w-full bg-slate-900/95 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40 px-4 py-3 shadow-md">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Left: Return to Hub & Patient badge */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
           <button
             onClick={() => navigate("/screening")}
-            className="flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:text-teal-300 bg-teal-950/40 hover:bg-teal-950/70 border border-teal-800/60 rounded-lg px-2.5 py-1.5 transition-all"
+            className="flex items-center gap-1.5 text-xs font-semibold text-teal-300 hover:text-teal-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Screening Hub</span>
           </button>
 
           {patient && (
-            <div className="text-xs text-slate-300 bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2">
+            <div className="text-xs text-slate-300 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-1 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span className="font-semibold text-white">{patient.name || "Patient"}</span>
               <span className="text-slate-400">({patient.gender || "Female"}, {patient.age || 50}y)</span>
@@ -75,12 +75,12 @@ export default function ScreeningStepper({ currentStep = 1 }) {
               <div key={s.num} className="flex items-center">
                 <button
                   onClick={() => navigate(s.route)}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-all ${
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
                     isActive
-                      ? "bg-teal-500/20 border-teal-500 text-teal-300 shadow-[0_0_15px_rgba(20,184,166,0.2)]"
+                      ? "bg-slate-800/90 border-teal-500 text-teal-300 shadow-md ring-1 ring-teal-500/30"
                       : isCompleted
-                      ? "bg-emerald-950/30 border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/50"
-                      : "bg-slate-800/40 border-slate-800 text-slate-400 hover:bg-slate-800/70"
+                      ? "bg-slate-900 border-emerald-700/80 text-emerald-300 hover:bg-slate-800"
+                      : "bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-850"
                   }`}
                 >
                   <div
@@ -89,7 +89,7 @@ export default function ScreeningStepper({ currentStep = 1 }) {
                         ? "bg-teal-500 text-slate-950"
                         : isCompleted
                         ? "bg-emerald-600 text-white"
-                        : "bg-slate-700 text-slate-300"
+                        : "bg-slate-850 text-slate-400 border border-slate-700"
                     }`}
                   >
                     {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.num}
@@ -100,7 +100,7 @@ export default function ScreeningStepper({ currentStep = 1 }) {
                   </div>
                 </button>
                 {idx < steps.length - 1 && (
-                  <div className={`hidden md:block w-3 h-0.5 mx-1 ${isCompleted ? "bg-emerald-600" : "bg-slate-800"}`}></div>
+                  <div className={`hidden md:block w-3 h-0.5 mx-1 ${isCompleted ? "bg-emerald-500" : "bg-slate-800"}`}></div>
                 )}
               </div>
             )
